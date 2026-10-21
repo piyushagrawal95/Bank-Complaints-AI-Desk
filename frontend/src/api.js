@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const rawApiUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = rawApiUrl.replace(/\/+$/, "");
 const TOKEN_KEY = "bank_complaints_token";
 
 export function getToken() {
