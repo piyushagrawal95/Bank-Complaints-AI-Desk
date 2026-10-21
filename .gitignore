@@ -1,0 +1,31 @@
+# Environments & Secrets (CRITICAL SECURITY)
+.env
+*.env
+**/.env
+.venv/
+env/
+venv/
+
+# CFPB Data & Large Files (never commit to git per PDF rules)
+data/
+*.csv
+*.zip
+*.pdf
+outbox/
+
+# Python cache & test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Node / React Frontend
+node_modules/
+dist/
+build/
+.vite/
+
+# System Files
+.DS_Store
+Thumbs.db
+*.log
