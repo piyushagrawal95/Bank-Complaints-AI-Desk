@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { forgotPassword, login, resetPassword, saveToken, signup } from "./api";
+import { forgotPassword, login,loginWithGoogle, resetPassword, saveToken, signup } from "./api";
 import { IconShield } from "./Icons";
 import "./Login.css";
 
@@ -49,6 +49,43 @@ function Login({ onLoggedIn }) {
       setMode("reset");
     }
   }, []);
+
+  async function handleGoogleSuccess(response){
+    setLoading(true);
+    setError(null);
+    try{
+      const data=await loginWithGoogle(response.credential);
+      saveToken(data.access_token);
+      onLoggedIn(data.user);
+    }
+    catch(err){
+      setError(err.message||"Google Login failed")
+    }
+    finally{
+      setLoading(false);
+    }
+  }
+
+  useEffect(()=>{
+    if(window.google&&(mode==="login"||mode==="signup")){
+      window.google.accounts.id.initialize({
+        client_id:"639319834126-b1ouen3no25o2elim13idbab182m3tjd.apps.googleusercontent.com",
+        callback:handleGoogleSuccess
+
+      })
+      const btnContainer=document.getElementById("googleBtn");
+      if(btnContainer){
+        window.google.accounts.id.renderButton(btnContainer,{
+          theme:"outline",
+          size:"large",
+          width:"100%",
+          text:"continue_with",
+          shape:"rectangular"
+        })
+      }
+    }
+
+  },[mode])
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -219,7 +256,7 @@ function Login({ onLoggedIn }) {
                   className="auth-input"
                   type="text"
                   required
-                  placeholder="e.g. Kashish Agrawal"
+                  placeholder="e.g. Piyush Agrawal"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                 />
@@ -307,6 +344,15 @@ function Login({ onLoggedIn }) {
                 ? "Send Reset Link"
                 : "Save New Password"}
             </button>
+            {/*Google Login Section */}
+            {(mode==="login"||mode==="signup")&&(
+              <>
+                <div style={{ margin: "1rem 0", textAlign: "center", color: "#64748b", fontSize: "0.85rem" }}>
+                  ─── OR ───
+                </div>
+                <div id="googleBtn" style={{ minHeight: "44px", display: "flex", justifyContent: "center" }}></div>
+              </>
+            )}
           </form>
 
           {mode === "login" && (

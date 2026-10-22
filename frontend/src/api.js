@@ -112,3 +112,11 @@ export const getUsers = () => request("/auth/users");
 export const updateUserRole = (user_id, role) =>
   request("/auth/users/role", { method: "PUT", body: { user_id, role } });
 
+export async function loginWithGoogle(credential) {
+  return request("/auth/google",{
+    method:"POST",
+    body:{credential}
+  })
+  
+}
+

@@ -8,7 +8,7 @@ import jwt
 
 from app.core.config import settings
 
-_N = 2**16  # CPU/memory cost
+_N = 2**14  # CPU/memory cost
 _R = 8
 _P = 2
 _MAXMEM = 128 * 1024 * 1024

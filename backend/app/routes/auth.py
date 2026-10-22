@@ -5,6 +5,8 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
@@ -21,6 +23,10 @@ from app.security import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+class GoogleLoginIn(BaseModel):
+    credential:str
+
 
 
 
@@ -105,6 +111,54 @@ def login(body: LoginIn):
             "full_name": user["full_name"],
             "role": user["role"],
         },
+    }
+
+@router.post("/google")
+def login_with_google(body:GoogleLoginIn):
+    client_id=os.getenv("GOOGLE_CLIENT_ID")
+    try:
+        #Google ka official token verification
+        idinfo=id_token.verify_oauth2_token(
+            body.credential,
+            google_requests.Request(),
+            client_id
+        )
+
+    except Exception:
+        raise HTTPException(status_code=401,detail="Google authentication failed or token is invalid")
+
+    email=idinfo["email"].lower()
+    full_name=idinfo.get("name","Google User")
+
+    with pool.connection() as conn:
+        #user check krenge ki database m h ya nahi
+        user=conn.execute(
+            "select id, email,full_name, role,is_active from users where email=%s",[email]
+        ).fetchone()
+
+        #agar user nahi mila to naya account create kro
+        if not user:
+            user=conn.execute(
+                "insert into users(email,password_hash,full_name,role) values(%s,'oauth_google',%s,'agent') returning id, email, full_name, role,is_active",
+                [email,full_name]
+            ).fetchone()
+
+    if not user["is_active"]:
+        raise HTTPException(status_code=403,detail="Your account has been deactivated")
+
+    #Bank system ka standard Jwt access token issue krenge
+    token=create_access_token(user["id"],user["role"])
+
+    return{
+        "access_token":token,
+        "token_type":"bearer",
+        "user":{
+            "id":user["id"],
+            "email":user["email"],
+            "full_name":user["full_name"],
+            "role":user["role"]
+        }
+
     }
 
 
