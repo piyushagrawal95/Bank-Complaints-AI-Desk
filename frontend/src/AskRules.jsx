@@ -3,10 +3,10 @@ import { askRule } from "./api";
 import "./AskRules.css";
 
 const QUICK_QUESTIONS = [
-  { text: "How many business days does a bank have to investigate an unauthorized error?", reg: "Reg E" },
-  { text: "At what times is a debt collector prohibited from calling consumers?", reg: "Reg F" },
-  { text: "What are consumer rights regarding credit reporting dispute investigations?", reg: "Reg V" },
-  { text: "What is the timeline for resolving credit card billing errors under Truth in Lending?", reg: "Reg Z" },
+  "How many business days does a bank have to investigate an unauthorized error?",
+  "At what times is a debt collector prohibited from calling consumers?",
+  "What are consumer rights regarding credit reporting dispute investigations?",
+  "What is the timeline for resolving credit card billing errors under Truth in Lending?",
 ];
 
 function AskRules() {
@@ -41,27 +41,26 @@ function AskRules() {
     <div className="rules-container">
       <div className="rules-header">
         <div className="rules-title-row">
-          <span className="rules-badge">Federal RAG Compliance</span>
-          <h2>Ask Banking Regulations (12 CFR)</h2>
+          <span className="rules-badge">Compliance Intelligence</span>
+          <h2>Ask Regulatory Compliance Questions</h2>
         </div>
         <p className="rules-subtitle">
-          Submit compliance questions against 4 official federal rulebooks: <strong>Regulation E</strong> (EFT), <strong>Regulation F</strong> (Debt Collection), <strong>Regulation V</strong> (Credit Reports), and <strong>Regulation Z</strong> (Truth in Lending). Answers are mathematically synthesized strictly from verified legal citations.
+          Submit compliance and dispute resolution questions. Answers are mathematically synthesized strictly from verified legal citations and banking standards.
         </p>
       </div>
 
       <div className="quick-prompts">
-        <span className="quick-label">Reference Inquiries by Regulation:</span>
+        <span className="quick-label">Suggested Questions:</span>
         <div className="quick-chips">
-          {QUICK_QUESTIONS.map((item, idx) => (
+          {QUICK_QUESTIONS.map((text, idx) => (
             <button
               key={idx}
               type="button"
               className="quick-chip"
-              onClick={() => handleQuickClick(item.text)}
+              onClick={() => handleQuickClick(text)}
               disabled={loading}
             >
-              <span className="chip-tag">{item.reg}</span>
-              <span>{item.text}</span>
+              <span>{text}</span>
             </button>
           ))}
         </div>

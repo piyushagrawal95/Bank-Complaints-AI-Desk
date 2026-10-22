@@ -292,6 +292,29 @@ function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("complaints");
   const [checking, setChecking] = useState(Boolean(getToken()));
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (!e.target.closest(".user-dropdown-wrapper")) {
+        setProfileOpen(false);
+      }
+    }
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "Escape") {
+        setShowProfileModal(false);
+        setProfileOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -352,18 +375,87 @@ function App() {
         </div>
 
         <div className="userbox">
-          <div className="user-profile">
-            <span className="user-avatar">
-              {user.full_name ? user.full_name[0].toUpperCase() : "U"}
-            </span>
-            <div className="user-details">
-              <span className="user-name">{user.full_name || user.email}</span>
-              <span className={`badge badge-${user.role}`}>{user.role}</span>
+          <div
+            className="user-dropdown-wrapper"
+            onMouseEnter={() => setProfileOpen(true)}
+            onMouseLeave={() => setProfileOpen(false)}
+          >
+            <div
+              className={`user-profile-trigger ${profileOpen ? "open" : ""}`}
+              onClick={() => setProfileOpen((prev) => !prev)}
+            >
+              <span className="user-avatar">
+                {user.full_name ? user.full_name[0].toUpperCase() : "U"}
+              </span>
+              <div className="user-details">
+                <span className="user-name">{user.full_name || user.email}</span>
+                <span className={`badge badge-${user.role}`}>
+                  {user.email.toLowerCase() === "piyushagrawal300504@gmail.com"
+                    ? "👑 Super Admin"
+                    : user.role}
+                </span>
+              </div>
+              <span className="dropdown-caret">▾</span>
             </div>
+
+            {profileOpen && (
+              <div className="profile-menu-dropdown">
+                <div className="dropdown-user-header">
+                  <span className="dropdown-avatar-large">
+                    {user.full_name ? user.full_name[0].toUpperCase() : "U"}
+                  </span>
+                  <div className="dropdown-user-info">
+                    <span className="dropdown-name">{user.full_name || "Bank Officer"}</span>
+                    <span className="dropdown-email">{user.email}</span>
+                    <span className="dropdown-session-badge">
+                      <span className="active-dot"></span> Active Session
+                    </span>
+                  </div>
+                </div>
+
+                <div className="dropdown-divider"></div>
+
+                <div className="dropdown-actions-list">
+                  <button
+                    type="button"
+                    className="dropdown-menu-item"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setShowProfileModal(true);
+                    }}
+                  >
+                    <span className="menu-item-icon">👤</span>
+                    <span>My Profile & Details</span>
+                  </button>
+
+                  {canManageUsers && (
+                    <button
+                      type="button"
+                      className="dropdown-menu-item"
+                      onClick={() => {
+                        setProfileOpen(false);
+                        setView("users");
+                      }}
+                    >
+                      <span className="menu-item-icon">👥</span>
+                      <span>User Management Portal</span>
+                    </button>
+                  )}
+
+                  <div className="dropdown-divider"></div>
+
+                  <button
+                    type="button"
+                    className="dropdown-menu-item logout-item"
+                    onClick={handleLogout}
+                  >
+                    <IconLogout size={15} />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <button className="secondary logout-btn" onClick={handleLogout} title="Sign out">
-            <IconLogout size={14} /> Log out
-          </button>
         </div>
       </header>
 
@@ -409,6 +501,70 @@ function App() {
           <ComplaintsPage currentUser={user} />
         )}
       </main>
+
+      {/* User Profile Details Modal */}
+      {showProfileModal && (
+        <div
+          className="profile-modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowProfileModal(false);
+          }}
+        >
+          <div className="profile-modal-card">
+            <div className="profile-modal-head">
+              <h3>User Profile & Account Info</h3>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setShowProfileModal(false)}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <div className="profile-info-grid">
+              <div className="profile-row">
+                <span className="profile-lbl">Account Name:</span>
+                <span className="profile-val">{user.full_name || "Bank Desk Officer"}</span>
+              </div>
+              <div className="profile-row">
+                <span className="profile-lbl">Email Address:</span>
+                <span className="profile-val">{user.email}</span>
+              </div>
+              <div className="profile-row">
+                <span className="profile-lbl">System Role:</span>
+                <span className="profile-val">
+                  <span className={`badge badge-${user.role}`}>
+                    {user.email.toLowerCase() === "piyushagrawal300504@gmail.com"
+                      ? "👑 Permanent Super Admin"
+                      : user.role.toUpperCase()}
+                  </span>
+                </span>
+              </div>
+              <div className="profile-row">
+                <span className="profile-lbl">Account Status:</span>
+                <span className="profile-val" style={{ color: "#16a34a" }}>
+                  ● Active & Verified
+                </span>
+              </div>
+              <div className="profile-row">
+                <span className="profile-lbl">User Record ID:</span>
+                <span className="profile-val">#{user.id}</span>
+              </div>
+            </div>
+
+            <div style={{ textAlign: "right" }}>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => setShowProfileModal(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
