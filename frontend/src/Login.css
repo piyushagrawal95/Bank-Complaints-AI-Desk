@@ -387,6 +387,62 @@ input[type="password"]::-ms-clear {
   text-decoration: underline;
 }
 
+/* =========================================
+   OAUTH & GOOGLE LOGIN STYLING
+   ========================================= */
+.oauth-section {
+  width: 100%;
+  margin-top: 1.25rem;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  margin-bottom: 1.15rem;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.divider-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.google-btn-wrapper {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 6px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.google-btn-wrapper:hover {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.google-btn-wrapper > div {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.google-btn-wrapper iframe {
+  border-radius: 6px !important;
+  margin: 0 auto !important;
+}
+
 /* Responsive adjustment for small screens */
 @media (max-width: 900px) {
   .auth-shell {

@@ -66,26 +66,44 @@ function Login({ onLoggedIn }) {
     }
   }
 
-  useEffect(()=>{
-    if(window.google&&(mode==="login"||mode==="signup")){
-      window.google.accounts.id.initialize({
-        client_id:"639319834126-b1ouen3no25o2elim13idbab182m3tjd.apps.googleusercontent.com",
-        callback:handleGoogleSuccess
+  useEffect(() => {
+    function renderGoogleBtn() {
+      if (!window.google || (mode !== "login" && mode !== "signup")) return;
+      try {
+        window.google.accounts.id.initialize({
+          client_id: "639319834126-b1ouen3no25o2elim13idbab182m3tjd.apps.googleusercontent.com",
+          callback: handleGoogleSuccess,
+        });
 
-      })
-      const btnContainer=document.getElementById("googleBtn");
-      if(btnContainer){
-        window.google.accounts.id.renderButton(btnContainer,{
-          theme:"outline",
-          size:"large",
-          width:"100%",
-          text:"continue_with",
-          shape:"rectangular"
-        })
+        const btnContainer = document.getElementById("googleBtn");
+        if (btnContainer) {
+          const targetWidth = Math.min(380, btnContainer.offsetWidth || 360);
+          window.google.accounts.id.renderButton(btnContainer, {
+            theme: "outline",
+            size: "large",
+            width: targetWidth,
+            text: "continue_with",
+            shape: "rectangular",
+            logo_alignment: "left",
+          });
+        }
+      } catch (e) {
+        console.error("Google Auth render error:", e);
       }
     }
 
-  },[mode])
+    if (window.google) {
+      renderGoogleBtn();
+    } else {
+      const timer = setInterval(() => {
+        if (window.google) {
+          clearInterval(timer);
+          renderGoogleBtn();
+        }
+      }, 100);
+      return () => clearInterval(timer);
+    }
+  }, [mode]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -344,14 +362,18 @@ function Login({ onLoggedIn }) {
                 ? "Send Reset Link"
                 : "Save New Password"}
             </button>
-            {/*Google Login Section */}
-            {(mode==="login"||mode==="signup")&&(
-              <>
-                <div style={{ margin: "1rem 0", textAlign: "center", color: "#64748b", fontSize: "0.85rem" }}>
-                  ─── OR ───
+            {/* Google Authentication Section */}
+            {(mode === "login" || mode === "signup") && (
+              <div className="oauth-section">
+                <div className="auth-divider">
+                  <span className="divider-line"></span>
+                  <span className="divider-text">Or continue with</span>
+                  <span className="divider-line"></span>
                 </div>
-                <div id="googleBtn" style={{ minHeight: "44px", display: "flex", justifyContent: "center" }}></div>
-              </>
+                <div className="google-btn-wrapper">
+                  <div id="googleBtn"></div>
+                </div>
+              </div>
             )}
           </form>
 
