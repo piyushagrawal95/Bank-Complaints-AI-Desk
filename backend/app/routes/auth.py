@@ -224,7 +224,7 @@ def send_confirmation_email(to_email: str, full_name: str | None = None) -> str:
 
     smtp_user = os.getenv("SMTP_USER", "")
     smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.maileroo.com")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
     smtp_from = os.getenv("SMTP_FROM", smtp_user)
 
@@ -288,7 +288,7 @@ def send_password_reset_email(to_email: str, raw_token: str):
 
     smtp_user = os.getenv("SMTP_USER", "")
     smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.maileroo.com")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
     smtp_from = os.getenv("SMTP_FROM", smtp_user)
 
