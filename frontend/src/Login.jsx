@@ -104,6 +104,9 @@ function Login({ onLoggedIn }) {
           cancel_on_tap_outside: true,
         });
 
+        // Disable automatic one-tap credential caching so user can always choose accounts
+        window.google.accounts.id.disableAutoSelect();
+
         const btnContainer = document.getElementById("googleBtn");
         if (btnContainer) {
           btnContainer.innerHTML = "";
