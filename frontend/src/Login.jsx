@@ -38,6 +38,7 @@ function Login({ onLoggedIn }) {
   const [resetToken, setResetToken] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -52,6 +53,7 @@ function Login({ onLoggedIn }) {
     const verifyToken = params.get("verify_email");
     if (verifyToken) {
       setLoading(true);
+      setLoadingMessage("Verifying email activation link...");
       setError(null);
       setSuccess(null);
       verifyEmail(verifyToken)
@@ -73,6 +75,7 @@ function Login({ onLoggedIn }) {
       return;
     }
     setLoading(true);
+    setLoadingMessage("Verifying Google account... Please wait");
     setError(null);
     try {
       console.log("Google callback received credential: YES");
@@ -140,16 +143,20 @@ function Login({ onLoggedIn }) {
 
     try {
       if (mode === "signup") {
+        setLoadingMessage("Creating your bank desk account...");
         const res = await signup(email, password, fullName);
         setMode("login");
         setPassword("");
         setFullName("");
+        setEmail("");
         setSuccess(res.message || "Account created successfully! You can now sign in.");
       } else if (mode === "login") {
+        setLoadingMessage("Signing in... Verifying credentials...");
         const result = await login(email, password);
         saveToken(result.access_token);
         onLoggedIn(result.user);
       } else if (mode === "forgot") {
+        setLoadingMessage("Sending password reset instructions...");
         const res = await forgotPassword(email);
         setSuccess(res.message);
         if (res.dev_reset_token) {
@@ -157,6 +164,7 @@ function Login({ onLoggedIn }) {
           setMode("reset");
         }
       } else if (mode === "reset") {
+        setLoadingMessage("Updating and securing your password...");
         const res = await resetPassword(resetToken, password);
         setMode("login");
         setPassword("");
@@ -265,6 +273,17 @@ function Login({ onLoggedIn }) {
             </p>
           </div>
 
+          {/* Active Loading Overlay with Professional Spinner */}
+          {loading && (
+            <div className="auth-loading-overlay">
+              <div className="auth-spinner-box">
+                <div className="auth-spinner-ring"></div>
+                <p className="auth-spinner-title">{loadingMessage || "Please wait..."}</p>
+                <span className="auth-spinner-sub">Connecting to secure regulatory compliance server</span>
+              </div>
+            </div>
+          )}
+
           {/* Mode Switcher Tabs - Only Sign In and Register */}
           {(mode === "login" || mode === "signup") && (
             <div className="auth-mode-tabs">
@@ -275,6 +294,8 @@ function Login({ onLoggedIn }) {
                   setMode("login");
                   setError(null);
                   setSuccess(null);
+                  setEmail("");
+                  setPassword("");
                 }}
               >
                 Sign In
@@ -286,6 +307,9 @@ function Login({ onLoggedIn }) {
                   setMode("signup");
                   setError(null);
                   setSuccess(null);
+                  setEmail("");
+                  setPassword("");
+                  setFullName("");
                 }}
               >
                 Create Account
@@ -293,7 +317,11 @@ function Login({ onLoggedIn }) {
             </div>
           )}
 
-          <form className="auth-form" onSubmit={handleSubmit}>
+          <form className="auth-form" onSubmit={handleSubmit} autoComplete="off">
+            {/* Decoy hidden inputs to prevent aggressive browser autofill */}
+            <input type="text" style={{ display: "none" }} tabIndex="-1" aria-hidden="true" autoComplete="off" />
+            <input type="password" style={{ display: "none" }} tabIndex="-1" aria-hidden="true" autoComplete="off" />
+
             {/* Google Authentication Section (Above manual form fields) */}
             {(mode === "login" || mode === "signup") && (
               <div className="oauth-top-section">
@@ -318,6 +346,9 @@ function Login({ onLoggedIn }) {
                   placeholder="e.g. Piyush Agrawal"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                  autoComplete="off"
+                  name="complaint_desk_fullname"
+                  spellCheck="false"
                 />
               </div>
             )}
@@ -332,6 +363,12 @@ function Login({ onLoggedIn }) {
                   placeholder="name@bank.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="off"
+                  name="complaint_desk_email_no_autofill"
+                  id="complaint_desk_email_no_autofill"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
                 />
               </div>
             )}
@@ -346,6 +383,9 @@ function Login({ onLoggedIn }) {
                   placeholder="Paste token received in email"
                   value={resetToken}
                   onChange={(e) => setResetToken(e.target.value)}
+                  autoComplete="off"
+                  name="complaint_desk_token"
+                  spellCheck="false"
                 />
               </div>
             )}
@@ -376,6 +416,8 @@ function Login({ onLoggedIn }) {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="new-password"
+                    name="complaint_desk_password"
                   />
                   <button
                     type="button"
@@ -393,15 +435,20 @@ function Login({ onLoggedIn }) {
             {error && <div className="auth-message auth-error">{error}</div>}
 
             <button type="submit" className="auth-submit-btn" disabled={loading}>
-              {loading
-                ? "Processing..."
-                : mode === "signup"
-                ? "Create Account"
-                : mode === "login"
-                ? "Sign In"
-                : mode === "forgot"
-                ? "Send Reset Link"
-                : "Save New Password"}
+              {loading ? (
+                <span className="btn-loading-content">
+                  <span className="btn-spinner-icon"></span>
+                  <span>{loadingMessage || "Processing..."}</span>
+                </span>
+              ) : mode === "signup" ? (
+                "Create Account"
+              ) : mode === "login" ? (
+                "Sign In"
+              ) : mode === "forgot" ? (
+                "Send Reset Link"
+              ) : (
+                "Save New Password"
+              )}
             </button>
           </form>
 
@@ -416,6 +463,9 @@ function Login({ onLoggedIn }) {
                     setMode("signup");
                     setError(null);
                     setSuccess(null);
+                    setEmail("");
+                    setPassword("");
+                    setFullName("");
                   }}
                 >
                   Create account
@@ -435,6 +485,8 @@ function Login({ onLoggedIn }) {
                     setMode("login");
                     setError(null);
                     setSuccess(null);
+                    setEmail("");
+                    setPassword("");
                   }}
                 >
                   Sign in
@@ -452,6 +504,8 @@ function Login({ onLoggedIn }) {
                   setMode("login");
                   setError(null);
                   setSuccess(null);
+                  setEmail("");
+                  setPassword("");
                 }}
               >
                 ← Back to Sign In

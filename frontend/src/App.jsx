@@ -177,7 +177,12 @@ function ComplaintsPage({ currentUser }) {
       )}
 
       {error && <div className="error">Could not load complaints: {error}</div>}
-      {loading && <p className="info">Loading complaint records from database...</p>}
+      {loading && (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "1rem 0", color: "#0284c7" }}>
+          <div className="inline-spinner"></div>
+          <span style={{ fontSize: "0.92rem", fontWeight: 500 }}>Loading complaint records from database...</span>
+        </div>
+      )}
 
       {!error && data && (
         <>
@@ -311,8 +316,16 @@ function App() {
 
   if (checking) {
     return (
-      <div className="container" style={{ padding: "3rem", textAlign: "center" }}>
-        <p className="info">Initializing Bank Complaint AI Desk...</p>
+      <div className="container" style={{ padding: "5rem 2rem", textAlign: "center" }}>
+        <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+          <div className="app-init-spinner"></div>
+          <p style={{ color: "#334155", fontWeight: 500, margin: 0, fontSize: "1.05rem" }}>
+            Initializing Bank Complaint AI Desk...
+          </p>
+          <span style={{ fontSize: "0.84rem", color: "#64748b" }}>
+            Connecting to regulatory compliance intelligence service
+          </span>
+        </div>
       </div>
     );
   }
