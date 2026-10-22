@@ -367,8 +367,10 @@ function Login({ onLoggedIn }) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="off"
-                  name="complaint_desk_email_no_autofill"
-                  id="complaint_desk_email_no_autofill"
+                  readOnly
+                  onFocus={(e) => e.target.removeAttribute("readonly")}
+                  name="clean_email_field"
+                  id="clean_email_field"
                   autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck="false"
@@ -420,7 +422,9 @@ function Login({ onLoggedIn }) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="new-password"
-                    name="complaint_desk_password"
+                    readOnly
+                    onFocus={(e) => e.target.removeAttribute("readonly")}
+                    name="clean_password_field"
                   />
                   <button
                     type="button"
