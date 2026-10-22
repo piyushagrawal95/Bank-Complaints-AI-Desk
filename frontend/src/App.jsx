@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   clearToken,
   getComplaints,
@@ -294,15 +294,37 @@ function App() {
   const [checking, setChecking] = useState(Boolean(getToken()));
   const [profileOpen, setProfileOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const profileTimeoutRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const handleProfileEnter = () => {
+    if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+    setProfileOpen(true);
+  };
+
+  const handleProfileLeave = () => {
+    profileTimeoutRef.current = setTimeout(() => {
+      setProfileOpen(false);
+    }, 280);
+  };
+
+  const handleTriggerClick = (e) => {
+    e.stopPropagation();
+    if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+    setProfileOpen((prev) => !prev);
+  };
 
   useEffect(() => {
     function handleClickOutside(e) {
-      if (!e.target.closest(".user-dropdown-wrapper")) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setProfileOpen(false);
       }
     }
     window.addEventListener("click", handleClickOutside);
-    return () => window.removeEventListener("click", handleClickOutside);
+    return () => {
+      window.removeEventListener("click", handleClickOutside);
+      if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -376,13 +398,14 @@ function App() {
 
         <div className="userbox">
           <div
+            ref={dropdownRef}
             className="user-dropdown-wrapper"
-            onMouseEnter={() => setProfileOpen(true)}
-            onMouseLeave={() => setProfileOpen(false)}
+            onMouseEnter={handleProfileEnter}
+            onMouseLeave={handleProfileLeave}
           >
             <div
               className={`user-profile-trigger ${profileOpen ? "open" : ""}`}
-              onClick={() => setProfileOpen((prev) => !prev)}
+              onClick={handleTriggerClick}
             >
               <span className="user-avatar">
                 {user.full_name ? user.full_name[0].toUpperCase() : "U"}
@@ -420,6 +443,7 @@ function App() {
                     type="button"
                     className="dropdown-menu-item"
                     onClick={() => {
+                      if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
                       setProfileOpen(false);
                       setShowProfileModal(true);
                     }}
@@ -433,6 +457,7 @@ function App() {
                       type="button"
                       className="dropdown-menu-item"
                       onClick={() => {
+                        if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
                         setProfileOpen(false);
                         setView("users");
                       }}
@@ -447,7 +472,11 @@ function App() {
                   <button
                     type="button"
                     className="dropdown-menu-item logout-item"
-                    onClick={handleLogout}
+                    onClick={() => {
+                      if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+                      setProfileOpen(false);
+                      handleLogout();
+                    }}
                   >
                     <IconLogout size={15} />
                     <span>Sign Out</span>

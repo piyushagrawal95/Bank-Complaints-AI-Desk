@@ -156,7 +156,7 @@ body {
 
 .profile-menu-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 4px);
   right: 0;
   width: 280px;
   background: #ffffff;
@@ -166,6 +166,17 @@ body {
   z-index: 1000;
   padding: 0.75rem 0;
   animation: dropdownFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Invisible bridge so mouse hover is never lost when moving from trigger to menu */
+.profile-menu-dropdown::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background: transparent;
 }
 
 @keyframes dropdownFadeIn {
@@ -381,6 +392,66 @@ body {
   color: #1d4ed8;
   border: 1px solid #bfdbfe;
   font-weight: 600;
+}
+
+/* =========================================
+   OVERVIEW METRIC CARDS
+   ========================================= */
+.overview-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.15rem;
+  margin-bottom: 1.75rem;
+}
+
+.metric-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.metric-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.06);
+  transform: translateY(-2px);
+}
+
+.metric-icon {
+  background: #eff6ff;
+  color: #1e40af;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid #dbeafe;
+  flex-shrink: 0;
+}
+
+.metric-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-val {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.metric-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-top: 0.2rem;
 }
 
 /* NAVIGATION TABS */
