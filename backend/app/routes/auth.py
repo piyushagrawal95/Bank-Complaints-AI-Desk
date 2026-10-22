@@ -79,10 +79,13 @@ def signup(body: SignupIn):
     if row is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
-    #Confirmation link bhejenge
-    send_confirmation_email(row["email"],row["full_name"])
+    # Confirmation link bhejenge
+    confirm_link = send_confirmation_email(row["email"], row["full_name"])
 
-    return {"message":"Account created! A confirmation link has been sent to your email"}
+    return {
+        "message": "Account created! A confirmation link has been sent to your email.",
+        "dev_confirm_link": confirm_link,
+    }
 
 
 @router.post("/verify-email")
@@ -110,7 +113,7 @@ def verify_email(body:VerifyEmailIn):
     except Exception:
         raise HTTPException(status_code=503,detail="Database error while verifying email")
 
-    return {"message":"Email successfully verified!! Your account is now active.Please sign in"}
+    return {"message": "Email successfully verified! Your account is now active. Please sign in."}
 
 @router.post("/login")
 def login(body: LoginIn):
@@ -206,29 +209,29 @@ def login_with_google(body:GoogleLoginIn):
 def me(user=Depends(get_current_user)):
     return user
 
-def send_confirmation_email(to_email:str,full_name:str | None=None):
-    """Sends an account activation link"""
-    smtp_user=os.getenv("SMTP_USER","")
-    smtp_password=os.getenv("SMTP_PASSWORD","")
-    smtp_host=os.getenv("SMTP_HOST","smtp.maileroo.com")
-    smtp_port=int(os.getenv("SMTP_PORT",587))
-    smtp_from=os.getenv("SMTP_FROM",smtp_user)
+def send_confirmation_email(to_email: str, full_name: str | None = None) -> str:
+    """Sends an account activation link via Maileroo with dual-port retry and returns link."""
+    verify_token = jwt.encode(
+        {
+            "email": to_email,
+            "type": "verify_email",
+            "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+        },
+        settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+    )
+    confirm_link = f"{settings.frontend_origin}/?verify_email={verify_token}"
+
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.maileroo.com")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_from = os.getenv("SMTP_FROM", smtp_user)
 
     if not smtp_user or not smtp_password:
         logger.info(f"SMTP not configured. Skipped confirmation email for {to_email}")
-        return
+        return confirm_link
 
-    #24 hours ke liye cryptographically signed token
-    verify_token=jwt.encode(
-        {
-            "email": to_email,
-            "type":"verify_email",
-            "exp":datetime.now(timezone.utc)+timedelta(hours=24)
-        },
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm
-    )
-    confirm_link = f"{settings.frontend_origin}/?verify_email={verify_token}"
     name_display = full_name if full_name else "Bank Associate"
     subject = "Confirm Your Account - Bank Complaint AI Desk"
     html_content = f"""
@@ -253,16 +256,29 @@ def send_confirmation_email(to_email:str,full_name:str | None=None):
     msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
     msg["To"] = to_email
     msg.attach(MIMEText(html_content, "html"))
-    try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_from, to_email, msg.as_string())
-        logger.info(f"Confirmation email sent to {to_email}")
-    except Exception as exc:
-        logger.exception(f"Failed to dispatch confirmation email: {exc}")
-    
 
+    # Dual-port fallback: try primary port (587), fallback to 2525 if blocked by host
+    ports_to_try = [smtp_port]
+    if 2525 not in ports_to_try:
+        ports_to_try.append(2525)
+
+    sent = False
+    for p in ports_to_try:
+        try:
+            with smtplib.SMTP(smtp_host, p, timeout=8) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_from, to_email, msg.as_string())
+            logger.info(f"Confirmation email sent to {to_email} via port {p}")
+            sent = True
+            break
+        except Exception as exc:
+            logger.warning(f"SMTP dispatch on port {p} failed: {exc}")
+
+    if not sent:
+        logger.error(f"Failed to dispatch email to {to_email} on ports {ports_to_try}")
+
+    return confirm_link
 
 
 def send_password_reset_email(to_email: str, raw_token: str):
