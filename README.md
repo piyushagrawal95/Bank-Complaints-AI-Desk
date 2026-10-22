@@ -38,7 +38,10 @@ Runs at: `http://localhost:5173`
 ---
 
 ## Detailed Documentation
-Complete architectural, API, pipeline, and evaluation docs are located in the [`docs/`](docs/) directory:
+A comprehensive technical report covering all requirements, technology justifications, system architecture, benchmarks, and learnings is available in **[`PROJECT_DOCUMENTATION.md`](PROJECT_DOCUMENTATION.md)**.
+
+Additional modular documents are located in the [`docs/`](docs/) directory:
+- [**`PROJECT_DOCUMENTATION.md`**](PROJECT_DOCUMENTATION.md): **Master Comprehensive Technical & Architecture Report**
 - [`docs/setup.md`](docs/setup.md): Complete setup guide
 - [`docs/architecture.md`](docs/architecture.md): System architecture and design choices
 - [`docs/api.md`](docs/api.md): Full API specification
