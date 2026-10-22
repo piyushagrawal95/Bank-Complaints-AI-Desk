@@ -134,27 +134,7 @@ function Login({ onLoggedIn }) {
         setMode("login");
         setPassword("");
         setFullName("");
-        if (res.dev_confirm_link) {
-          setSuccess(
-            <span>
-              Account created! Please check your email inbox (or Spam).{" "}
-              <a
-                href={res.dev_confirm_link}
-                style={{
-                  display: "inline-block",
-                  marginTop: "6px",
-                  color: "#0284c7",
-                  fontWeight: "600",
-                  textDecoration: "underline",
-                }}
-              >
-                Click here to verify now
-              </a>
-            </span>
-          );
-        } else {
-          setSuccess(res.message || "Account created! A confirmation link has been sent to your email.");
-        }
+        setSuccess(res.message || "Account created successfully! You can now sign in.");
       } else if (mode === "login") {
         const result = await login(email, password);
         saveToken(result.access_token);

@@ -65,11 +65,10 @@ def signup(body: SignupIn):
     email = body.email.lower()
     try:
         with pool.connection() as conn:
-            #is_active=false set kiya hai jab tak confirm na krein
             row = conn.execute(
-                "INSERT INTO users (email, password_hash, full_name, role,is_active) "
-                "VALUES (%s, %s, %s, 'agent',false) ON CONFLICT (email) DO NOTHING "
-                "RETURNING id, email, full_name, role",
+                "INSERT INTO users (email, password_hash, full_name, role, is_active) "
+                "VALUES (%s, %s, %s, 'agent', true) ON CONFLICT (email) DO NOTHING "
+                "RETURNING id, email, full_name, role, is_active",
                 [email, hash_password(body.password), body.full_name],
             ).fetchone()
     except Exception as exc:
@@ -79,12 +78,14 @@ def signup(body: SignupIn):
     if row is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
-    # Confirmation link bhejenge
-    confirm_link = send_confirmation_email(row["email"], row["full_name"])
+    # Send welcome email asynchronously / gracefully
+    try:
+        send_confirmation_email(row["email"], row["full_name"])
+    except Exception as exc:
+        logger.warning(f"Email notification skipped: {exc}")
 
     return {
-        "message": "Account created! A confirmation link has been sent to your email.",
-        "dev_confirm_link": confirm_link,
+        "message": "Account created successfully! You can now sign in with your credentials.",
     }
 
 
