@@ -68,16 +68,23 @@ function Login({ onLoggedIn }) {
   }, []);
 
   async function handleGoogleSuccess(response) {
+    if (!response || !response.credential) {
+      console.warn("No credential in Google response:", response);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      console.log("Google callback received credential:", response ? "YES" : "NO");
+      console.log("Google callback received credential: YES");
       const data = await loginWithGoogle(response.credential);
+      if (!data || !data.access_token) {
+        throw new Error("Login failed: missing access token from server.");
+      }
       saveToken(data.access_token);
       onLoggedIn(data.user);
     } catch (err) {
       console.error("Google Login Backend Error:", err);
-      setError(err.message || "Google Login failed");
+      setError(err.message || "Google Login failed. Please try again or sign in with email.");
     } finally {
       setLoading(false);
     }
@@ -90,10 +97,13 @@ function Login({ onLoggedIn }) {
         window.google.accounts.id.initialize({
           client_id: "639319834126-b1ouen3no25o2elim13idbab182m3tjd.apps.googleusercontent.com",
           callback: handleGoogleSuccess,
+          auto_select: false,
+          cancel_on_tap_outside: true,
         });
 
         const btnContainer = document.getElementById("googleBtn");
         if (btnContainer) {
+          btnContainer.innerHTML = "";
           const targetWidth = Math.min(380, btnContainer.offsetWidth || 360);
           window.google.accounts.id.renderButton(btnContainer, {
             theme: "outline",
@@ -290,10 +300,9 @@ function Login({ onLoggedIn }) {
                 <div className="google-btn-wrapper">
                   <div id="googleBtn"></div>
                 </div>
-                {error && <div className="auth-message auth-error" style={{ margin: "0.75rem 0" }}>{error}</div>}
                 <div className="auth-divider">
                   <span className="divider-line"></span>
-                  <span className="divider-text">Or continue with</span>
+                  <span className="divider-text">Or enter credentials manually</span>
                   <span className="divider-line"></span>
                 </div>
               </div>

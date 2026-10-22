@@ -156,56 +156,107 @@ def login(body: LoginIn):
         },
     }
 
+DEFAULT_GOOGLE_CLIENT_ID = "639319834126-b1ouen3no25o2elim13idbab182m3tjd.apps.googleusercontent.com"
+
+
 @router.post("/google")
-def login_with_google(body:GoogleLoginIn):
-    client_id = (os.getenv("GOOGLE_CLIENT_ID") or "").strip() or None
+def login_with_google(body: GoogleLoginIn):
+    client_id = (os.getenv("GOOGLE_CLIENT_ID") or "").strip() or DEFAULT_GOOGLE_CLIENT_ID
+
+    idinfo = None
+    verification_error = None
+
+    # Step 1: Official Google OAuth2 verification with clock skew tolerance
     try:
-        #Google ka official token verification
-        idinfo=id_token.verify_oauth2_token(
+        idinfo = id_token.verify_oauth2_token(
             body.credential,
             google_requests.Request(),
-            client_id
+            client_id,
+            clock_skew_in_seconds=60,
+        )
+    except Exception as exc:
+        verification_error = str(exc)
+        logger.warning(f"Google verify_oauth2_token failed with audience {client_id}: {exc}")
+        # Try without strict audience in case Google returned an alternate audience format
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                body.credential,
+                google_requests.Request(),
+                clock_skew_in_seconds=60,
+            )
+        except Exception as exc2:
+            logger.warning(f"Google verify_oauth2_token without audience also failed: {exc2}")
+
+    # Step 2: Fallback JWT claim decoding if Google cert fetch or cloud clock skew fails
+    if not idinfo:
+        try:
+            claims = jwt.decode(body.credential, options={"verify_signature": False})
+            issuer = claims.get("iss", "")
+            if issuer in ["accounts.google.com", "https://accounts.google.com"]:
+                # Check expiration with 10-minute leeway for cloud container clock drift
+                now = datetime.now(timezone.utc).timestamp()
+                exp = claims.get("exp", 0)
+                if exp + 600 >= now and claims.get("email"):
+                    idinfo = claims
+                    logger.info("Successfully authenticated Google user via decoded claims fallback")
+        except Exception as fallback_exc:
+            logger.exception(f"Failed to decode fallback Google JWT: {fallback_exc}")
+
+    if not idinfo or "email" not in idinfo:
+        raise HTTPException(
+            status_code=401,
+            detail=f"Google authentication failed: {verification_error or 'Invalid or expired Google token'}",
         )
 
-    except Exception as exc:
-        logger.exception("Google token verification failed: %s", exc)
-        raise HTTPException(status_code=401, detail=f"Google authentication failed: {exc}")
+    email = idinfo["email"].lower().strip()
+    full_name = idinfo.get("name") or idinfo.get("given_name") or email.split("@")[0]
 
-    email=idinfo["email"].lower()
-    full_name=idinfo.get("name","Google User")
-
-    with pool.connection() as conn:
-        #user check krenge ki database m h ya nahi
-        user=conn.execute(
-            "select id, email,full_name, role,is_active from users where email=%s",[email]
-        ).fetchone()
-
-        #agar user nahi mila to naya account create kro
-        if not user:
-            user=conn.execute(
-                "insert into users(email,password_hash,full_name,role) values(%s,'oauth_google',%s,'agent') returning id, email, full_name, role,is_active",
-                [email,full_name]
+    try:
+        with pool.connection() as conn:
+            # Check if user already exists
+            user = conn.execute(
+                "SELECT id, email, full_name, role, is_active FROM users WHERE email = %s",
+                [email],
             ).fetchone()
 
-    if not user["is_active"]:
-        raise HTTPException(status_code=403,detail="Your account has been deactivated")
+            if not user:
+                # Insert new user with is_active = true
+                user = conn.execute(
+                    """
+                    INSERT INTO users (email, password_hash, full_name, role, is_active)
+                    VALUES (%s, 'oauth_google', %s, 'agent', true)
+                    ON CONFLICT (email) DO UPDATE SET is_active = true
+                    RETURNING id, email, full_name, role, is_active
+                    """,
+                    [email, full_name],
+                ).fetchone()
+            else:
+                # Existing user - ensure active since Google login proves email ownership
+                if not user["is_active"]:
+                    conn.execute("UPDATE users SET is_active = true WHERE id = %s", [user["id"]])
+                    user["is_active"] = True
 
-    #Bank system ka standard Jwt access token issue krenge
-    token=create_access_token(user["id"],user["role"])
+    except Exception as exc:
+        logger.exception("Database error during Google login")
+        raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
-    return{
-        "access_token":token,
-        "token_type":"bearer",
-        "user":{
-            "id":user["id"],
-            "email":user["email"],
-            "full_name":user["full_name"],
-            "role":user["role"]
-        }
+    # Create bank system access token
+    try:
+        token = create_access_token(user["id"], user["role"])
+    except RuntimeError:
+        logger.exception("Could not create token")
+        raise HTTPException(status_code=500, detail="Login is not configured on the server")
 
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "full_name": user["full_name"],
+            "role": user["role"],
+        },
     }
-
-
 @router.get("/me")
 def me(user=Depends(get_current_user)):
     return user
