@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { forgotPassword, login,loginWithGoogle, resetPassword, saveToken, signup } from "./api";
+import { forgotPassword, login, loginWithGoogle, resetPassword, saveToken, signup, verifyEmail } from "./api";
 import { IconShield } from "./Icons";
 import "./Login.css";
 
@@ -47,6 +47,23 @@ function Login({ onLoggedIn }) {
     if (token) {
       setResetToken(token);
       setMode("reset");
+    }
+
+    const verifyToken = params.get("verify_email");
+    if (verifyToken) {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      verifyEmail(verifyToken)
+        .then((res) => {
+          setSuccess(res.message || "Email successfully verified! Your account is active. Please sign in.");
+          setMode("login");
+          window.history.replaceState({}, document.title, window.location.pathname);
+        })
+        .catch((err) => {
+          setError(err.message || "Email verification failed or link expired.");
+        })
+        .finally(() => setLoading(false));
     }
   }, []);
 
@@ -113,11 +130,11 @@ function Login({ onLoggedIn }) {
 
     try {
       if (mode === "signup") {
-        await signup(email, password, fullName);
+        const res = await signup(email, password, fullName);
         setMode("login");
         setPassword("");
         setFullName("");
-        setSuccess("Account created successfully. Please sign in.");
+        setSuccess(res.message || "Account created! A confirmation link has been sent to your email. Please verify to activate your account.");
       } else if (mode === "login") {
         const result = await login(email, password);
         saveToken(result.access_token);

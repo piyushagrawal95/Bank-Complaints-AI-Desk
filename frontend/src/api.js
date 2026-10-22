@@ -113,10 +113,16 @@ export const updateUserRole = (user_id, role) =>
   request("/auth/users/role", { method: "PUT", body: { user_id, role } });
 
 export async function loginWithGoogle(credential) {
-  return request("/auth/google",{
-    method:"POST",
-    body:{credential}
-  })
-  
+  return request("/auth/google", {
+    method: "POST",
+    body: { credential },
+  });
+}
+
+export async function verifyEmail(token) {
+  return request("/auth/verify-email", {
+    method: "POST",
+    body: { token },
+  });
 }
 

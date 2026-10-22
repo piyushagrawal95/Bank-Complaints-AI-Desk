@@ -3,6 +3,7 @@ import hashlib
 import logging
 import os
 import smtplib
+import jwt
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from google.oauth2 import id_token
@@ -50,6 +51,10 @@ class ResetPasswordIn(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class VerifyEmailIn(BaseModel):
+    token:str
+
+
 class RoleUpdateIn(BaseModel):
     user_id: int
     role: str = Field(pattern="^(agent|supervisor|admin)$")
@@ -60,9 +65,10 @@ def signup(body: SignupIn):
     email = body.email.lower()
     try:
         with pool.connection() as conn:
+            #is_active=false set kiya hai jab tak confirm na krein
             row = conn.execute(
-                "INSERT INTO users (email, password_hash, full_name, role) "
-                "VALUES (%s, %s, %s, 'agent') ON CONFLICT (email) DO NOTHING "
+                "INSERT INTO users (email, password_hash, full_name, role,is_active) "
+                "VALUES (%s, %s, %s, 'agent',false) ON CONFLICT (email) DO NOTHING "
                 "RETURNING id, email, full_name, role",
                 [email, hash_password(body.password), body.full_name],
             ).fetchone()
@@ -72,8 +78,39 @@ def signup(body: SignupIn):
 
     if row is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
-    return row
 
+    #Confirmation link bhejenge
+    send_confirmation_email(row["email"],row["full_name"])
+
+    return {"message":"Account created! A confirmation link has been sent to your email"}
+
+
+@router.post("/verify-email")
+def verify_email(body:VerifyEmailIn):
+    """Verifies email confirmation token and activates the user account"""
+    try:
+        payload=jwt.decode(body.token,settings.jwt_secret,algorithms=[settings.jwt_algorithm])
+        if payload.get("type")!="verify_email":
+            raise HTTPException(status_code=400,detail="Invalid verification token")
+        email=payload.get("email")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400,detail="Confirmation Link has expired.Please signup again")
+    except Exception:
+        raise HTTPException(status_code=400,detail="Invalid or malformed verification link")
+
+
+    try:
+        with pool.connection() as conn:
+            res=conn.execute("Update users set is_active=true where email=%s returning id,email,is_active",[email]).fetchone()
+            if not res:
+                raise HTTPException(status_code=404,detail="User account not found")
+
+    except HTTPException:
+        raise 
+    except Exception:
+        raise HTTPException(status_code=503,detail="Database error while verifying email")
+
+    return {"message":"Email successfully verified!! Your account is now active.Please sign in"}
 
 @router.post("/login")
 def login(body: LoginIn):
@@ -89,12 +126,14 @@ def login(body: LoginIn):
         logger.exception("Database error during login")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
-    if (
-        user is None
-        or not user["is_active"]
-        or not verify_password(body.password, user["password_hash"])
-    ):
+    if user is None or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
+
+    if not user["is_active"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email address before logging in. Check your inbox for the confirmation link."
+        )
 
     try:
         token = create_access_token(user["id"], user["role"])
@@ -167,6 +206,64 @@ def login_with_google(body:GoogleLoginIn):
 def me(user=Depends(get_current_user)):
     return user
 
+def send_confirmation_email(to_email:str,full_name:str | None=None):
+    """Sends an account activation link"""
+    smtp_user=os.getenv("SMTP_USER","")
+    smtp_password=os.getenv("SMTP_PASSWORD","")
+    smtp_host=os.getenv("SMTP_HOST","smtp.maileroo.com")
+    smtp_port=int(os.getenv("SMTP_PORT",587))
+    smtp_from=os.getenv("SMTP_FROM",smtp_user)
+
+    if not smtp_user or not smtp_password:
+        logger.info(f"SMTP not configured. Skipped confirmation email for {to_email}")
+        return
+
+    #24 hours ke liye cryptographically signed token
+    verify_token=jwt.encode(
+        {
+            "email": to_email,
+            "type":"verify_email",
+            "exp":datetime.now(timezone.utc)+timedelta(hours=24)
+        },
+        settings.jwt_secret,
+        algorithm=settings.jwt_algorithm
+    )
+    confirm_link = f"{settings.frontend_origin}/?verify_email={verify_token}"
+    name_display = full_name if full_name else "Bank Associate"
+    subject = "Confirm Your Account - Bank Complaint AI Desk"
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1e293b; background: #f8fafc; padding: 20px;">
+        <div style="max-width: 520px; margin: 0 auto; background: white; padding: 24px; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.04);">
+          <h2 style="color: #0284c7; margin-top: 0;">🏛️ Bank Complaint AI Desk</h2>
+          <p>Hello <strong>{name_display}</strong>,</p>
+          <p>Thank you for registering. Please click the button below to verify your email address and activate your banking desk account:</p>
+          <p style="text-align: center; margin: 28px 0;">
+            <a href="{confirm_link}" style="background-color: #0284c7; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+              Confirm Email Address
+            </a>
+          </p>
+          <p style="color: #64748b; font-size: 13px;">This confirmation link will expire in 24 hours. If you did not create this account, please ignore this email.</p>
+        </div>
+      </body>
+    </html>
+    """
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(html_content, "html"))
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_from, to_email, msg.as_string())
+        logger.info(f"Confirmation email sent to {to_email}")
+    except Exception as exc:
+        logger.exception(f"Failed to dispatch confirmation email: {exc}")
+    
+
+
 
 def send_password_reset_email(to_email: str, raw_token: str):
     """Sends a professional password reset email with a 15-minute secure link."""
@@ -175,8 +272,9 @@ def send_password_reset_email(to_email: str, raw_token: str):
 
     smtp_user = os.getenv("SMTP_USER", "")
     smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.maileroo.com")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_from = os.getenv("SMTP_FROM", smtp_user)
 
     if not smtp_user or not smtp_password:
         logger.info(f"SMTP not configured in .env. Dev password reset link for {to_email}: {reset_link}")
@@ -203,7 +301,7 @@ def send_password_reset_email(to_email: str, raw_token: str):
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = f"Bank Complaint AI Desk <{smtp_user}>"
+    msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
     msg["To"] = to_email
     msg.attach(MIMEText(html_content, "html"))
 
@@ -211,7 +309,7 @@ def send_password_reset_email(to_email: str, raw_token: str):
         with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
             server.starttls()
             server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_user, to_email, msg.as_string())
+            server.sendmail(smtp_from, to_email, msg.as_string())
         logger.info(f"Password reset email sent to {to_email}")
     except Exception as exc:
         logger.exception(f"Failed to dispatch reset email via SMTP: {exc}")
