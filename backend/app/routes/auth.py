@@ -66,7 +66,7 @@ def signup(body: SignupIn):
                 "RETURNING id, email, full_name, role",
                 [email, hash_password(body.password), body.full_name],
             ).fetchone()
-    except Exception:
+    except Exception as exc:
         logger.exception("Database error during signup")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
@@ -85,7 +85,7 @@ def login(body: LoginIn):
                 "FROM users WHERE email = %s",
                 [email],
             ).fetchone()
-    except Exception:
+    except Exception as exc:
         logger.exception("Database error during login")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
@@ -115,7 +115,7 @@ def login(body: LoginIn):
 
 @router.post("/google")
 def login_with_google(body:GoogleLoginIn):
-    client_id=os.getenv("GOOGLE_CLIENT_ID")
+    client_id = (os.getenv("GOOGLE_CLIENT_ID") or "").strip() or None
     try:
         #Google ka official token verification
         idinfo=id_token.verify_oauth2_token(
@@ -124,8 +124,9 @@ def login_with_google(body:GoogleLoginIn):
             client_id
         )
 
-    except Exception:
-        raise HTTPException(status_code=401,detail="Google authentication failed or token is invalid")
+    except Exception as exc:
+        logger.exception("Google token verification failed: %s", exc)
+        raise HTTPException(status_code=401, detail=f"Google authentication failed: {exc}")
 
     email=idinfo["email"].lower()
     full_name=idinfo.get("name","Google User")
@@ -235,7 +236,7 @@ def forgot_password(body: ForgotPasswordIn):
                 "VALUES (%s, %s, %s)",
                 [email, token_hash, expires_at],
             )
-    except Exception:
+    except Exception as exc:
         logger.exception("Error creating reset token")
         raise HTTPException(status_code=503, detail="Database is unavailable. Please try again.")
 
@@ -276,7 +277,7 @@ def reset_password(body: ResetPasswordIn):
             )
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         logger.exception("Error executing password reset")
         raise HTTPException(status_code=503, detail="Database error. Please try again.")
 
@@ -291,7 +292,7 @@ def list_users(admin=Depends(require_role("admin"))):
                 "SELECT id, email, full_name, role, is_active, created_at "
                 "FROM users ORDER BY id"
             ).fetchall()
-    except Exception:
+    except Exception as exc:
         logger.exception("Database error while listing users")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
@@ -309,6 +310,6 @@ def update_user_role(body: RoleUpdateIn, admin=Depends(require_role("admin"))):
             return row
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         logger.exception("Database error while updating role")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")

@@ -50,18 +50,18 @@ function Login({ onLoggedIn }) {
     }
   }, []);
 
-  async function handleGoogleSuccess(response){
+  async function handleGoogleSuccess(response) {
     setLoading(true);
     setError(null);
-    try{
-      const data=await loginWithGoogle(response.credential);
+    try {
+      console.log("Google callback received credential:", response ? "YES" : "NO");
+      const data = await loginWithGoogle(response.credential);
       saveToken(data.access_token);
       onLoggedIn(data.user);
-    }
-    catch(err){
-      setError(err.message||"Google Login failed")
-    }
-    finally{
+    } catch (err) {
+      console.error("Google Login Backend Error:", err);
+      setError(err.message || "Google Login failed");
+    } finally {
       setLoading(false);
     }
   }
@@ -273,6 +273,7 @@ function Login({ onLoggedIn }) {
                 <div className="google-btn-wrapper">
                   <div id="googleBtn"></div>
                 </div>
+                {error && <div className="auth-message auth-error" style={{ margin: "0.75rem 0" }}>{error}</div>}
                 <div className="auth-divider">
                   <span className="divider-line"></span>
                   <span className="divider-text">Or continue with</span>
