@@ -109,10 +109,17 @@ function UserManagement({ currentUser }) {
                   <tr key={u.id} className={isCurrent ? "current-user-row" : ""}>
                     <td>#{u.id}</td>
                     <td>
-                      <span>{u.full_name || "User"}</span>
+                      <span className="user-name-cell">{u.full_name || "User"}</span>
                       {isCurrent && <span className="you-pill">You</span>}
+                      {u.email.toLowerCase() === "piyushagrawal300504@gmail.com" && (
+                        <span className="root-admin-pill" title="System Founder & Permanent Root Administrator">
+                          👑 Owner
+                        </span>
+                      )}
                     </td>
-                    <td>{u.email}</td>
+                    <td>
+                      <span className="email-cell">{u.email}</span>
+                    </td>
                     <td>
                       <span className={`role-badge role-${u.role}`}>{u.role}</span>
                     </td>
@@ -120,17 +127,25 @@ function UserManagement({ currentUser }) {
                       <span className="status-pill active-pill">Active</span>
                     </td>
                     <td>
-                      <select
-                        className="role-select"
-                        value={u.role}
-                        disabled={updatingId === u.id}
-                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                      >
-                        <option value="agent">Agent</option>
-                        <option value="supervisor">Supervisor</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                      {updatingId === u.id && <span className="updating-spinner">...</span>}
+                      {u.email.toLowerCase() === "piyushagrawal300504@gmail.com" ? (
+                        <span className="super-admin-lock-tag" title="Root Super Admin (Role is permanently locked)">
+                          🔒 Permanent Admin
+                        </span>
+                      ) : (
+                        <div className="role-change-wrapper">
+                          <select
+                            className="role-select"
+                            value={u.role}
+                            disabled={updatingId === u.id}
+                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                          >
+                            <option value="agent">Agent</option>
+                            <option value="supervisor">Supervisor</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          {updatingId === u.id && <span className="updating-spinner">...</span>}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

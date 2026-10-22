@@ -467,12 +467,23 @@ def list_users(admin=Depends(require_role("admin"))):
 def update_user_role(body: RoleUpdateIn, admin=Depends(require_role("admin"))):
     try:
         with pool.connection() as conn:
+            target = conn.execute(
+                "SELECT id, email, role FROM users WHERE id = %s", [body.user_id]
+            ).fetchone()
+            if not target:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            # Permanent Root Super Admin Protection: Cannot be demoted or changed by anyone
+            if target["email"].lower() == "piyushagrawal300504@gmail.com" and body.role != "admin":
+                raise HTTPException(
+                    status_code=403,
+                    detail="The root Super Admin (piyushagrawal300504@gmail.com) cannot be modified or demoted by any user."
+                )
+
             row = conn.execute(
                 "UPDATE users SET role = %s WHERE id = %s RETURNING id, email, role",
                 [body.role, body.user_id],
             ).fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="User not found")
             return row
     except HTTPException:
         raise

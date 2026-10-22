@@ -69,3 +69,20 @@ def test_google_login_mock_token(client):
     assert "access_token" in data
     assert data["user"]["email"] == "test_google_runner@bank.com"
 
+
+def test_permanent_admin_protection(client):
+    from app.security import create_access_token
+    # Admin token
+    admin_token = create_access_token(user_id=11, role="admin")
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # Attempt to demote user 11 (piyushagrawal300504@gmail.com)
+    res = client.put(
+        "/auth/users/role",
+        headers=headers,
+        json={"user_id": 11, "role": "agent"},
+    )
+    assert res.status_code == 403
+    assert "cannot be modified or demoted" in res.json()["detail"]
+
+

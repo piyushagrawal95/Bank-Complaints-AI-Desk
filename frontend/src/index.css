@@ -29,9 +29,9 @@ body {
 }
 
 .container {
-  max-width: 1260px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem;
+  padding: 2rem 1.5rem;
 }
 
 /* TOPBAR & BRANDING */
@@ -39,9 +39,12 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 1.1rem;
-  margin-bottom: 1.5rem;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.15rem 1.5rem;
+  margin-bottom: 1.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   flex-wrap: wrap;
   gap: 1rem;
 }
@@ -171,37 +174,38 @@ body {
 .overview-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  gap: 1.15rem;
+  margin-bottom: 1.75rem;
 }
 
 .metric-card {
   background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 9px;
-  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  gap: 1.15rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .metric-card:hover {
   border-color: #cbd5e1;
-  box-shadow: 0 3px 6px -1px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.06);
+  transform: translateY(-2px);
 }
 
 .metric-icon {
-  background: #f8fafc;
+  background: #eff6ff;
   color: #1e40af;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  border: 1px solid #dbeafe;
 }
 
 .metric-info {
@@ -210,8 +214,8 @@ body {
 }
 
 .metric-val {
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.35rem;
+  font-weight: 700;
   color: #0f172a;
   line-height: 1.2;
 }
@@ -219,15 +223,15 @@ body {
 .metric-sub {
   font-size: 0.8rem;
   color: var(--text-muted);
-  font-weight: 400;
-  margin-top: 0.15rem;
+  font-weight: 500;
+  margin-top: 0.2rem;
 }
 
 /* NAVIGATION TABS */
 .tabs {
   display: flex;
-  gap: 0.35rem;
-  margin-bottom: 1.5rem;
+  gap: 0.4rem;
+  margin-bottom: 1.75rem;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
 }
@@ -236,16 +240,16 @@ body {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  padding: 0.65rem 1rem;
-  font-size: 0.9rem;
+  padding: 0.75rem 1.15rem;
+  font-size: 0.92rem;
   font-weight: 500;
   color: #64748b;
   cursor: pointer;
   margin-bottom: -1px;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
   white-space: nowrap;
 }
 
@@ -264,8 +268,8 @@ button {
   background: var(--primary);
   color: white;
   border: 1px solid transparent;
-  padding: 0.55rem 1rem;
-  border-radius: 7px;
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
   font-size: 0.88rem;
@@ -297,13 +301,14 @@ button.secondary:hover:not(:disabled) {
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.75rem;
   background: white;
-  padding: 0.85rem 1rem;
-  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
   border: 1px solid var(--border);
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
   align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .search-box {
@@ -311,12 +316,12 @@ button.secondary:hover:not(:disabled) {
   display: flex;
   align-items: center;
   flex: 1;
-  min-width: 220px;
+  min-width: 240px;
 }
 
 .search-icon {
   position: absolute;
-  left: 0.75rem;
+  left: 0.85rem;
   color: #94a3b8;
   display: flex;
   align-items: center;
@@ -324,35 +329,40 @@ button.secondary:hover:not(:disabled) {
 }
 
 .search-box input {
-  padding-left: 2.2rem !important;
+  padding-left: 2.35rem !important;
   width: 100%;
 }
 
 .filters input,
 .filters select {
-  padding: 0.5rem 0.75rem;
+  padding: 0.55rem 0.85rem;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.88rem;
   color: #1e293b;
   background: white;
   font-family: inherit;
+  transition: all 0.15s;
 }
 
 .filters input:focus,
 .filters select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.12);
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
 }
 
 .primary-btn {
   background: var(--primary);
   color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 0.55rem 1.25rem;
 }
 
 .reset-btn {
   margin-left: auto;
+  border-radius: 8px;
 }
 
 /* TABLE META INFO */
@@ -360,29 +370,29 @@ button.secondary:hover:not(:disabled) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
   font-size: 0.86rem;
   color: #64748b;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .filter-badge {
   background: #e0f2fe;
   color: #0369a1;
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-/* COMPLAINTS TABLE - SOFT & EASY ON THE EYES (NO AGGRESSIVE BOLD) */
+/* COMPLAINTS TABLE - REFINED CLEAN LUXURY */
 .table-wrap {
   background: white;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid var(--border);
   overflow-x: auto;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.03);
+  margin-bottom: 1.5rem;
 }
 
 table {
@@ -394,29 +404,31 @@ table {
 
 th {
   background: #f8fafc;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border);
   color: #64748b;
-  font-weight: 500; /* Soft header weight */
-  font-size: 0.82rem;
+  font-weight: 600;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   white-space: nowrap;
 }
 
 td {
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid #f1f5f9;
   color: #334155;
-  font-weight: 400; /* Standard, comfortable normal font weight */
+  font-weight: 400;
   vertical-align: middle;
 }
 
 tr.clickable {
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.15s ease;
 }
 
 tr.clickable:hover {
-  background: #f8fafc; /* Gentle subtle hover */
+  background: #f8fafc;
 }
 
 /* Subtle, soft cells - no harsh contrast */

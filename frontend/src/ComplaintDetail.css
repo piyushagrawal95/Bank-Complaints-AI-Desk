@@ -1,21 +1,57 @@
+/* =========================================
+   COMPLAINT DETAIL MODAL OVERLAY
+   ========================================= */
+.detail-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+  animation: fadeInModal 0.2s ease-out;
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.detail-modal-container {
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
 .detail-card {
   background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 14px;
-  padding: 1.75rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
-  animation: slideDown 0.25s ease-out;
+  padding: 2rem;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
 }
 
-@keyframes slideDown {
+@keyframes slideUpModal {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(20px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -28,10 +64,35 @@
   margin-bottom: 1.25rem;
 }
 
+.detail-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.case-id-tag {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid #bfdbfe;
+}
+
+.modal-close-btn {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .detail-head h2 {
   margin: 0;
   color: #0f172a;
-  font-size: 1.5rem;
+  font-size: 1.45rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }

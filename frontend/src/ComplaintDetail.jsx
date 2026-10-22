@@ -144,14 +144,37 @@ function ComplaintDetail({ id, currentUser, onClose }) {
     currentUser?.email ||
     "User";
 
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
   return (
-    <div className="detail-card">
-      <div className="detail-head">
-        <h2>Complaint #{id}</h2>
-        <button className="secondary" onClick={onClose}>
-          Close
-        </button>
-      </div>
+    <div
+      className="detail-modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="detail-modal-container">
+        <div className="detail-card">
+          <div className="detail-head">
+            <div className="detail-title-group">
+              <span className="case-id-tag">Case Record</span>
+              <h2>Complaint #{id}</h2>
+            </div>
+            <button className="secondary modal-close-btn" onClick={onClose} title="Close (Esc)">
+              ✕ Close
+            </button>
+          </div>
 
       {loading && <p className="info">Loading complaint record...</p>}
       {error && <div className="error">Could not load complaint: {error}</div>}
@@ -299,6 +322,8 @@ function ComplaintDetail({ id, currentUser, onClose }) {
           </section>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }
