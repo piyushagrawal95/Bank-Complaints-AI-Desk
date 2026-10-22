@@ -390,32 +390,9 @@ input[type="password"]::-ms-clear {
 /* =========================================
    OAUTH & GOOGLE LOGIN STYLING
    ========================================= */
-.oauth-section {
+.oauth-top-section {
   width: 100%;
-  margin-top: 1.25rem;
-}
-
-.auth-divider {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.85rem;
-  margin-bottom: 1.15rem;
-}
-
-.divider-line {
-  flex: 1;
-  height: 1px;
-  background: #e2e8f0;
-}
-
-.divider-text {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: #94a3b8;
-  text-transform: uppercase;
-  white-space: nowrap;
+  margin-bottom: 0.25rem;
 }
 
 .google-btn-wrapper {
@@ -425,6 +402,7 @@ input[type="password"]::-ms-clear {
   justify-content: center;
   align-items: center;
   border-radius: 6px;
+  margin-bottom: 1.15rem;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -441,6 +419,29 @@ input[type="password"]::-ms-clear {
 .google-btn-wrapper iframe {
   border-radius: 6px !important;
   margin: 0 auto !important;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.divider-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 /* Responsive adjustment for small screens */

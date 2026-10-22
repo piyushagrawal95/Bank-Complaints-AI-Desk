@@ -267,6 +267,20 @@ function Login({ onLoggedIn }) {
           )}
 
           <form className="auth-form" onSubmit={handleSubmit}>
+            {/* Google Authentication Section (Above manual form fields) */}
+            {(mode === "login" || mode === "signup") && (
+              <div className="oauth-top-section">
+                <div className="google-btn-wrapper">
+                  <div id="googleBtn"></div>
+                </div>
+                <div className="auth-divider">
+                  <span className="divider-line"></span>
+                  <span className="divider-text">Or continue with</span>
+                  <span className="divider-line"></span>
+                </div>
+              </div>
+            )}
+
             {mode === "signup" && (
               <div className="auth-field">
                 <label>Full Name</label>
@@ -362,19 +376,6 @@ function Login({ onLoggedIn }) {
                 ? "Send Reset Link"
                 : "Save New Password"}
             </button>
-            {/* Google Authentication Section */}
-            {(mode === "login" || mode === "signup") && (
-              <div className="oauth-section">
-                <div className="auth-divider">
-                  <span className="divider-line"></span>
-                  <span className="divider-text">Or continue with</span>
-                  <span className="divider-line"></span>
-                </div>
-                <div className="google-btn-wrapper">
-                  <div id="googleBtn"></div>
-                </div>
-              </div>
-            )}
           </form>
 
           {mode === "login" && (
