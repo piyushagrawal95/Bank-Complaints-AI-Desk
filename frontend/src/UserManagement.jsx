@@ -94,7 +94,6 @@ function UserManagement({ currentUser }) {
           <table className="users-table">
             <thead>
               <tr>
-                <th>ID</th>
                 <th>Name</th>
                 <th>Email Address</th>
                 <th>Current Role</th>
@@ -107,7 +106,6 @@ function UserManagement({ currentUser }) {
                 const isCurrent = currentUser && currentUser.id === u.id;
                 return (
                   <tr key={u.id} className={isCurrent ? "current-user-row" : ""}>
-                    <td>#{u.id}</td>
                     <td>
                       <span className="user-name-cell">{u.full_name || "User"}</span>
                       {isCurrent && <span className="you-pill">You</span>}

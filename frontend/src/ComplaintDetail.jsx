@@ -41,7 +41,8 @@ function ComplaintDetail({ id, currentUser, onClose }) {
       .then((result) => {
         if (cancelled) return;
         setComplaint(result);
-        setAnalysis(result.analysis);
+        // Do not pre-load analysis so each user sees "Analyze with AI" interactively on open
+        setAnalysis(null);
         if (result.response) {
           setReplyDraft(result.response.response_text);
           setResponseRecord(result.response);
@@ -171,7 +172,7 @@ function ComplaintDetail({ id, currentUser, onClose }) {
               <span className="case-id-tag">Case Record</span>
               <h2>Complaint #{id}</h2>
             </div>
-            <button className="secondary modal-close-btn" onClick={onClose} title="Close (Esc)">
+            <button className="modal-close-btn" onClick={onClose} title="Close (Esc)">
               ✕ Close
             </button>
           </div>
@@ -202,11 +203,12 @@ function ComplaintDetail({ id, currentUser, onClose }) {
               <h3>AI Categorization & Summary</h3>
               {analysis && (
                 <button
-                  className="secondary small-btn"
+                  className="refresh-ai-btn"
                   disabled={analyzing}
                   onClick={() => runAnalysis(true)}
+                  title="Re-run AI analysis with fresh insights"
                 >
-                  {analyzing ? "Re-analyzing..." : "Refresh AI"}
+                  {analyzing ? "Re-analyzing..." : "↻ Refresh AI"}
                 </button>
               )}
             </div>
@@ -225,11 +227,11 @@ function ComplaintDetail({ id, currentUser, onClose }) {
               </div>
             ) : (
               <button
+                className="ai-trigger-btn"
                 disabled={analyzing}
                 onClick={() => runAnalysis(false)}
-                style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
               >
-                {analyzing ? "Analyzing with AI..." : (<><IconSparkles size={14} /> Classify & Summarize</>)}
+                {analyzing ? "Analyzing with AI..." : (<><IconSparkles size={15} /> Analyze with AI</>)}
               </button>
             )}
             {analyzeError && <div className="error">{analyzeError}</div>}
@@ -240,11 +242,11 @@ function ComplaintDetail({ id, currentUser, onClose }) {
             <div className="section-head-row">
               <h3>Similar Past Complaints</h3>
               <button
-                className="secondary small-btn"
+                className="find-similar-btn"
                 disabled={loadingSimilar}
                 onClick={loadSimilarCases}
               >
-                {loadingSimilar ? "Searching..." : similarCases.length ? "Re-fetch" : "Find Similar Cases"}
+                {loadingSimilar ? "Searching..." : similarCases.length ? "↻ Re-fetch Similar Cases" : "🔍 Find Similar Cases"}
               </button>
             </div>
 
@@ -270,8 +272,8 @@ function ComplaintDetail({ id, currentUser, onClose }) {
           <section className="section-block">
             <div className="section-head-row">
               <h3>AI Response Draft</h3>
-              <button disabled={drafting} onClick={generateDraft}>
-                {drafting ? "Drafting with AI..." : replyDraft ? "Regenerate Draft" : "Draft Reply with AI"}
+              <button className="draft-ai-btn" disabled={drafting} onClick={generateDraft}>
+                {drafting ? "Drafting with AI..." : replyDraft ? "↻ Regenerate Draft" : "✍️ Draft Reply with AI"}
               </button>
             </div>
 

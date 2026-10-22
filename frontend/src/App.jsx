@@ -547,10 +547,6 @@ function App() {
                   ● Active & Verified
                 </span>
               </div>
-              <div className="profile-row">
-                <span className="profile-lbl">User Record ID:</span>
-                <span className="profile-val">#{user.id}</span>
-              </div>
             </div>
 
             <div style={{ textAlign: "right" }}>
