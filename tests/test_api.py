@@ -158,9 +158,13 @@ def test_trends_spikes_rbac(client):
 
 def test_similar_complaints_search(client):
     from app.security import create_access_token
+    from app.db import pool
+    with pool.connection() as conn:
+        row = conn.execute("SELECT complaint_id FROM complaint_embeddings LIMIT 1").fetchone()
+        cid = row["complaint_id"] if row else 1743702
     admin = get_admin_user()
     token = create_access_token(user_id=admin["id"], role="admin")
-    res = client.get("/complaints/2026100000/similar?top_k=3", headers={"Authorization": f"Bearer {token}"})
+    res = client.get(f"/complaints/{cid}/similar?top_k=3", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     data = res.json()
     assert "similar" in data
