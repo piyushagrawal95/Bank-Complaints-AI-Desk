@@ -1,3 +1,4 @@
+from datetime import date
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -17,16 +18,29 @@ GROUP_COLUMNS = {"product": "product", "issue": "issue", "company": "company"}
 @router.get("/spikes")
 def spikes(
     group_by: str = Query("product", pattern="^(product|issue|company)$"),
-    window_days: int = Query(7, ge=1, le=31),
+    window_days: int = Query(7, ge=1, le=180),
     baseline_windows: int = Query(4, ge=1, le=12),
     threshold: float = Query(1.5, ge=1.0, le=10.0),
-    min_count: int = Query(30, ge=1, le=100000),
+    min_count: int = Query(10, ge=1, le=100000),
+    as_of: date | None = Query(None, description="Optional reference date (defaults to latest date)"),
 ):
+    # Guard if invoked directly in test environments without FastAPI DI
+    if hasattr(window_days, "default"):
+        window_days = window_days.default
+    if hasattr(baseline_windows, "default"):
+        baseline_windows = baseline_windows.default
+    if hasattr(threshold, "default"):
+        threshold = threshold.default
+    if hasattr(min_count, "default"):
+        min_count = min_count.default
+    if hasattr(as_of, "default"):
+        as_of = as_of.default
+
     column = GROUP_COLUMNS[group_by]
 
     sql = f"""
         WITH bounds AS (
-            SELECT MAX(date_received) AS max_date, MIN(date_received) AS min_date
+            SELECT COALESCE(%s::date, MAX(date_received)) AS max_date, MIN(date_received) AS min_date
             FROM complaints
         ),
         counted AS (
@@ -35,7 +49,8 @@ def spikes(
                    COUNT(*) AS n
             FROM complaints c
             CROSS JOIN bounds b
-            WHERE c.date_received > b.max_date - (%s::int * (%s::int + 1))
+            WHERE c.date_received <= b.max_date
+              AND c.date_received > b.max_date - (%s::int * (%s::int + 1))
             GROUP BY 1, 2
         )
         SELECT grp, bucket, n,
@@ -47,7 +62,7 @@ def spikes(
     try:
         with pool.connection() as conn:
             rows = conn.execute(
-                sql, [window_days, window_days, baseline_windows]
+                sql, [as_of, window_days, window_days, baseline_windows]
             ).fetchall()
     except Exception:
         logger.exception("Database error while calculating spikes")
@@ -55,7 +70,7 @@ def spikes(
 
     if not rows:
         return {
-            "as_of": None,
+            "as_of": as_of.isoformat() if as_of else None,
             "group_by": group_by,
             "window_days": window_days,
             "baseline_windows": baseline_windows,
