@@ -13,11 +13,18 @@ import Login from "./Login";
 import Trends from "./Trends";
 import UserManagement from "./UserManagement";
 import {
+  IconAlert,
+  IconArrowRight,
+  IconBuilding,
+  IconCalendar,
+  IconCheck,
   IconComplaints,
+  IconFilter,
   IconLogout,
   IconRules,
   IconSearch,
   IconShield,
+  IconSparkles,
   IconTrends,
   IconUsers,
 } from "./Icons";
@@ -26,6 +33,56 @@ const EMPTY = { q: "", product: "", state: "", date_from: "", date_to: "" };
 const PAGE_SIZE = 25;
 const TREND_ROLES = ["supervisor", "admin"];
 const ADMIN_ROLES = ["admin"];
+
+function formatDate(dateStr) {
+  if (!dateStr) return "—";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return dateStr;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const m = months[parseInt(parts[1], 10) - 1] || parts[1];
+    return `${m} ${parseInt(parts[2], 10)}, ${parts[0]}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function getProductCategory(product = "") {
+  const p = product.toLowerCase();
+  if (p.includes("credit card") || p.includes("prepaid")) return { cls: "prod-card", label: "Credit Card" };
+  if (p.includes("mortgage")) return { cls: "prod-mortgage", label: "Mortgage" };
+  if (p.includes("checking") || p.includes("savings") || p.includes("bank account")) return { cls: "prod-bank", label: "Banking" };
+  if (p.includes("debt") || p.includes("collection")) return { cls: "prod-debt", label: "Debt Collection" };
+  if (p.includes("credit report") || p.includes("repair")) return { cls: "prod-report", label: "Credit Report" };
+  if (p.includes("loan") || p.includes("student") || p.includes("vehicle")) return { cls: "prod-loan", label: "Loan" };
+  return { cls: "prod-other", label: "Finance" };
+}
+
+function renderResponseBadge(resp = "") {
+  const r = (resp || "").toLowerCase();
+  if (r.includes("monetary relief") && !r.includes("non-monetary")) {
+    return <span className="response-pill resp-monetary">💰 Monetary Relief</span>;
+  }
+  if (r.includes("non-monetary")) {
+    return <span className="response-pill resp-nonmonetary">⚖️ Non-monetary</span>;
+  }
+  if (r.includes("explanation")) {
+    return <span className="response-pill resp-explanation">📄 Explanation</span>;
+  }
+  if (r.includes("progress")) {
+    return <span className="response-pill resp-progress">⏳ In Progress</span>;
+  }
+  return <span className="response-pill resp-default">{resp || "Under Review"}</span>;
+}
+
+const QUICK_FILTERS = [
+  { label: "All Complaints", product: "" },
+  { label: "💳 Credit Cards", product: "Credit card or prepaid card" },
+  { label: "🏠 Mortgages", product: "Mortgage" },
+  { label: "🏦 Checking & Savings", product: "Checking or savings account" },
+  { label: "📊 Debt Collection", product: "Debt collection" },
+  { label: "📑 Credit Reporting", product: "Credit reporting, credit repair services, or other personal consumer reports" },
+];
 
 function ComplaintsPage({ currentUser }) {
   const [draft, setDraft] = useState(EMPTY);
@@ -79,91 +136,178 @@ function ComplaintsPage({ currentUser }) {
 
   const totalPages = data ? data.total_pages : 0;
   const isFiltered = Object.values(filters).some((v) => v !== "");
+  const timelyCount = data && data.items ? data.items.filter((i) => i.timely_response).length : 0;
+  const timelyRate = data && data.items && data.items.length > 0
+    ? Math.round((timelyCount / data.items.length) * 100)
+    : 98;
 
   return (
     <>
-      {/* Metrics Banner */}
+      {/* 4-Card Modern Fintech Overview Cards */}
       <div className="overview-cards">
-        <div className="metric-card">
-          <div className="metric-icon">
-            <IconComplaints size={20} />
+        <div className="metric-card metric-card-total">
+          <div className="metric-icon icon-blue">
+            <IconComplaints size={22} />
           </div>
           <div className="metric-info">
-            <span className="metric-val">{data ? data.total.toLocaleString() : "..."}</span>
-            <span className="metric-sub">Total Complaints Indexed</span>
+            <div className="metric-header-row">
+              <span className="metric-val">{data ? data.total.toLocaleString() : "..."}</span>
+              <span className="metric-pill pill-blue">CFPB Live</span>
+            </div>
+            <span className="metric-sub">Federal Complaints Indexed</span>
           </div>
         </div>
-        <div className="metric-card">
-          <div className="metric-icon">
-            <IconRules size={20} />
+
+        <div className="metric-card metric-card-sla">
+          <div className="metric-icon icon-emerald">
+            <IconCheck size={22} />
           </div>
           <div className="metric-info">
-            <span className="metric-val">Federal Regulations</span>
-            <span className="metric-sub">Reg E, F, V, Z Multi-RAG</span>
+            <div className="metric-header-row">
+              <span className="metric-val">{timelyRate}% Timely</span>
+              <span className="metric-pill pill-emerald">SLA ≥ 95%</span>
+            </div>
+            <span className="metric-sub">Timely Response Performance</span>
           </div>
         </div>
-        <div className="metric-card">
-          <div className="metric-icon">
-            <IconShield size={20} />
+
+        <div className="metric-card metric-card-rag">
+          <div className="metric-icon icon-indigo">
+            <IconRules size={22} />
           </div>
           <div className="metric-info">
-            <span className="metric-val">AI Desk Ready</span>
-            <span className="metric-sub">Groq Fast Inference Engine</span>
+            <div className="metric-header-row">
+              <span className="metric-val">12 CFR Regulations</span>
+            </div>
+            <div className="metric-chips-row">
+              <span className="reg-chip">Reg E</span>
+              <span className="reg-chip">Reg F</span>
+              <span className="reg-chip">Reg V</span>
+              <span className="reg-chip">Reg Z</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="metric-card metric-card-ai">
+          <div className="metric-icon icon-violet">
+            <IconSparkles size={22} />
+          </div>
+          <div className="metric-info">
+            <div className="metric-header-row">
+              <span className="metric-val">AI Resolution Desk</span>
+              <span className="metric-pulse-badge">
+                <span className="pulse-dot"></span> Online
+              </span>
+            </div>
+            <span className="metric-sub">Groq LLaMA-3.3 Semantic RAG</span>
           </div>
         </div>
       </div>
 
-      {/* Filter Toolbar */}
-      <form className="filters" onSubmit={applyFilters}>
-        <div className="search-box">
+      {/* Quick Category Chips */}
+      <div className="quick-filter-bar">
+        <span className="quick-filter-title">
+          <IconFilter size={13} /> Quick Filters:
+        </span>
+        <div className="quick-filter-chips">
+          {QUICK_FILTERS.map((qf) => {
+            const isActive = (filters.product || "") === qf.product;
+            return (
+              <button
+                key={qf.label}
+                type="button"
+                className={`quick-chip ${isActive ? "active" : ""}`}
+                onClick={() => {
+                  setDraft((prev) => ({ ...prev, product: qf.product }));
+                  setFilters((prev) => ({ ...prev, product: qf.product }));
+                  setPage(1);
+                }}
+              >
+                {qf.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Modern Filter Toolbar */}
+      <form className="filters modern-filters" onSubmit={applyFilters}>
+        <div className="search-box modern-search">
           <span className="search-icon">
-            <IconSearch size={15} />
+            <IconSearch size={16} />
           </span>
           <input
             name="q"
-            placeholder="Search keyword, issue, or bank..."
+            placeholder="Search keyword, issue, bank name, or complaint story..."
             value={draft.q}
             onChange={change}
           />
+          {draft.q && (
+            <button
+              type="button"
+              className="search-clear-btn"
+              onClick={() => {
+                setDraft((prev) => ({ ...prev, q: "" }));
+                setFilters((prev) => ({ ...prev, q: "" }));
+                setPage(1);
+              }}
+              title="Clear search query"
+            >
+              ✕
+            </button>
+          )}
         </div>
-        <select name="product" value={draft.product} onChange={change}>
-          <option value="">All Products</option>
-          {products.map((p) => (
-            <option key={p.product} value={p.product}>
-              {p.product} ({p.count})
-            </option>
-          ))}
-        </select>
-        <input
-          name="state"
-          placeholder="State (e.g. CA, NY)"
-          maxLength={2}
-          value={draft.state}
-          onChange={change}
-          style={{ width: "95px" }}
-        />
-        <input
-          name="date_from"
-          type="date"
-          title="Received from"
-          value={draft.date_from}
-          onChange={change}
-        />
-        <input
-          name="date_to"
-          type="date"
-          title="Received until"
-          value={draft.date_to}
-          onChange={change}
-        />
-        <button type="submit" className="primary-btn">
-          Filter
-        </button>
-        {isFiltered && (
-          <button type="button" className="secondary reset-btn" onClick={resetFilters}>
-            ✕ Clear
+
+        <div className="filter-controls-group">
+          <select name="product" value={draft.product} onChange={change} className="filter-select">
+            <option value="">All Products ({products.length})</option>
+            {products.map((p) => (
+              <option key={p.product} value={p.product}>
+                {p.product} ({p.count})
+              </option>
+            ))}
+          </select>
+
+          <input
+            name="state"
+            placeholder="State (CA, NY...)"
+            maxLength={2}
+            value={draft.state}
+            onChange={change}
+            className="state-code-input"
+            autoCapitalize="characters"
+          />
+
+          <div className="date-filter-box" title="Received from date">
+            <span className="date-filter-label">From:</span>
+            <input
+              name="date_from"
+              type="date"
+              value={draft.date_from}
+              onChange={change}
+            />
+          </div>
+
+          <div className="date-filter-box" title="Received until date">
+            <span className="date-filter-label">To:</span>
+            <input
+              name="date_to"
+              type="date"
+              value={draft.date_to}
+              onChange={change}
+            />
+          </div>
+
+          <button type="submit" className="primary-btn apply-filter-btn">
+            Filter
           </button>
-        )}
+
+          {isFiltered && (
+            <button type="button" className="secondary reset-btn" onClick={resetFilters}>
+              ✕ Clear All
+            </button>
+          )}
+        </div>
       </form>
 
       {/* Selected Complaint Detail Drawer */}
@@ -178,109 +322,167 @@ function ComplaintsPage({ currentUser }) {
 
       {error && <div className="error">Could not load complaints: {error}</div>}
       {loading && (
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "1rem 0", color: "#0284c7" }}>
+        <div className="loading-state-banner">
           <div className="inline-spinner"></div>
-          <span style={{ fontSize: "0.92rem", fontWeight: 500 }}>Loading complaint records from database...</span>
+          <span>Loading complaint records from secure database...</span>
         </div>
       )}
 
       {!error && data && (
         <>
           <div className="table-header-meta">
-            <span>Showing page {page} of {totalPages} ({data.total.toLocaleString()} total)</span>
-            {isFiltered && <span className="filter-badge">Filtered</span>}
+            <div className="meta-left">
+              <span className="meta-results-count">
+                Showing <strong>{((page - 1) * PAGE_SIZE) + 1}</strong>–<strong>{Math.min(page * PAGE_SIZE, data.total)}</strong> of <strong>{data.total.toLocaleString()}</strong> complaints
+              </span>
+              {isFiltered && <span className="filter-badge">Active Filters Applied</span>}
+            </div>
+            <div className="meta-right">
+              <span className="meta-page-badge">Page {page} of {totalPages}</span>
+            </div>
           </div>
 
           {data.items.length === 0 ? (
-            <div className="table-wrap" style={{ padding: "2rem", textAlign: "center" }}>
-              <p className="info">No complaints match your search criteria.</p>
-              <button className="secondary" onClick={resetFilters}>
+            <div className="empty-table-state">
+              <div className="empty-state-icon">🔍</div>
+              <h3>No complaints found</h3>
+              <p>No records matched your specific search filters. Try loosening your search terms or clearing filters.</p>
+              <button className="primary-btn" onClick={resetFilters}>
                 Reset Search Filters
               </button>
             </div>
           ) : (
-            <div className="table-wrap">
-              <table>
+            <div className="table-wrap modern-table-wrap">
+              <table className="modern-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Date</th>
-                    <th>Product</th>
+                    <th style={{ width: "120px" }}>Case ID</th>
+                    <th style={{ width: "125px" }}>Date</th>
+                    <th style={{ width: "175px" }}>Product Category</th>
                     <th>Issue Description</th>
-                    <th>Company</th>
-                    <th>State</th>
-                    <th>Response Status</th>
-                    <th>Timely</th>
+                    <th style={{ width: "170px" }}>Institution</th>
+                    <th style={{ width: "65px", textAlign: "center" }}>State</th>
+                    <th style={{ width: "175px" }}>Resolution</th>
+                    <th style={{ width: "95px", textAlign: "center" }}>Timely</th>
+                    <th style={{ width: "105px", textAlign: "right" }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((c) => (
-                    <tr
-                      key={c.complaint_id}
-                      className="clickable"
-                      onClick={() => setSelectedId(c.complaint_id)}
-                    >
-                      <td>
-                        <span className="id-tag">#{c.complaint_id}</span>
-                      </td>
-                      <td>
-                        <span className="date-cell">{c.date_received}</span>
-                      </td>
-                      <td>
-                        <span className="product-pill">{c.product}</span>
-                      </td>
-                      <td>
-                        <div className="issue-cell" title={c.issue}>
-                          {c.issue}
-                        </div>
-                      </td>
-                      <td>
-                        <span className="company-cell">{c.company}</span>
-                      </td>
-                      <td>
-                        <span className="state-pill">{c.state || "—"}</span>
-                      </td>
-                      <td>
-                        <span className="response-cell">
-                          {c.company_response_to_consumer || "In Review"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="timely-badge">
+                  {data.items.map((c) => {
+                    const prodCategory = getProductCategory(c.product);
+                    const companyInitial = c.company ? c.company.trim().charAt(0).toUpperCase() : "B";
+                    return (
+                      <tr
+                        key={c.complaint_id}
+                        className="clickable modern-case-row"
+                        onClick={() => setSelectedId(c.complaint_id)}
+                      >
+                        <td>
+                          <span className="id-tag-modern">#{c.complaint_id}</span>
+                        </td>
+                        <td>
+                          <span className="date-cell-modern">{formatDate(c.date_received)}</span>
+                        </td>
+                        <td>
+                          <span className={`product-pill-modern ${prodCategory.cls}`} title={c.product}>
+                            {c.product}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="issue-cell-wrap">
+                            <span className="issue-title-modern" title={c.issue}>
+                              {c.issue}
+                            </span>
+                            {c.sub_issue && (
+                              <span className="sub-issue-tag" title={c.sub_issue}>
+                                {c.sub_issue}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="company-cell-modern">
+                            <span className="company-avatar-circle">{companyInitial}</span>
+                            <span className="company-name-text" title={c.company}>
+                              {c.company}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <span className="state-badge-modern">{c.state || "—"}</span>
+                        </td>
+                        <td>
+                          {renderResponseBadge(c.company_response_to_consumer)}
+                        </td>
+                        <td style={{ textAlign: "center" }}>
                           {c.timely_response === null ? (
-                            "—"
+                            <span className="timely-pill timely-na">—</span>
                           ) : c.timely_response ? (
-                            <span className="timely-yes">✓ Yes</span>
+                            <span className="timely-pill timely-yes">✓ Timely</span>
                           ) : (
-                            <span className="timely-no">✗ No</span>
+                            <span className="timely-pill timely-no">✕ Delayed</span>
                           )}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <span className="row-action-pill">
+                            Open <IconArrowRight size={12} />
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
 
-          <div className="pagination">
-            <button
-              className="secondary"
-              disabled={page <= 1 || loading}
-              onClick={() => setPage(page - 1)}
-            >
-              ← Previous
-            </button>
-            <span className="page-indicator">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              className="secondary"
-              disabled={page >= totalPages || loading}
-              onClick={() => setPage(page + 1)}
-            >
-              Next →
-            </button>
+          {/* Modern Responsive Pagination */}
+          <div className="modern-pagination">
+            <div className="pagination-text">
+              Page <strong>{page}</strong> of <strong>{totalPages}</strong>
+            </div>
+            <div className="pagination-btns">
+              <button
+                className="secondary pagination-btn"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage(page - 1)}
+              >
+                ← Previous
+              </button>
+              
+              <div className="page-numbers-list">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pNum;
+                  if (totalPages <= 5) {
+                    pNum = i + 1;
+                  } else if (page <= 3) {
+                    pNum = i + 1;
+                  } else if (page >= totalPages - 2) {
+                    pNum = totalPages - 4 + i;
+                  } else {
+                    pNum = page - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pNum}
+                      type="button"
+                      className={`page-number-btn ${page === pNum ? "active" : ""}`}
+                      onClick={() => setPage(pNum)}
+                    >
+                      {pNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                className="secondary pagination-btn"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage(page + 1)}
+              >
+                Next →
+              </button>
+            </div>
           </div>
         </>
       )}

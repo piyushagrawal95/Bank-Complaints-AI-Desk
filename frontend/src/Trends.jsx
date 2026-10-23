@@ -11,9 +11,14 @@ const GROUPS = [
 
 function formatChange(pct) {
   if (pct == null) {
-    return "New";
+    return <span className="shift-badge shift-new">New Category</span>;
   }
-  return `${pct > 0 ? "+" : ""}${pct}%`;
+  const isPos = pct > 0;
+  return (
+    <span className={`shift-badge ${isPos ? "shift-up" : "shift-down"}`}>
+      {isPos ? `+${pct}%` : `${pct}%`}
+    </span>
+  );
 }
 
 function Trends() {
@@ -122,8 +127,8 @@ function Trends() {
               {others.length > 0 && (
                 <div className="trend-section">
                   <h3 className="trend-heading">Top Baseline Categories</h3>
-                  <div className="table-wrap">
-                    <table>
+                  <div className="table-wrap modern-table-wrap">
+                    <table className="modern-table">
                       <thead>
                         <tr>
                           <th>{GROUPS.find((g) => g.value === groupBy).label}</th>
