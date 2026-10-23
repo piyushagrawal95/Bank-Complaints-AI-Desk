@@ -302,7 +302,7 @@ def dispatch_email_transport(to_email: str, subject: str, html_content: str, tex
             req = urllib.request.Request(
                 "https://api.resend.com/emails",
                 data=payload,
-                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
                 method="POST"
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
