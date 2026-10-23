@@ -15,7 +15,8 @@ import json
 import urllib.request
 import urllib.error
 from urllib.parse import urlparse
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+import re
 
 from app.core.config import settings
 from app.db import pool
@@ -36,10 +37,31 @@ class GoogleLoginIn(BaseModel):
 
 
 
+def validate_strong_password(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("Password must be at least 8 characters long.")
+    if len(v) > 128:
+        raise ValueError("Password must not exceed 128 characters.")
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Password must contain at least one uppercase letter (A-Z).")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("Password must contain at least one lowercase letter (a-z).")
+    if not re.search(r"\d", v):
+        raise ValueError("Password must contain at least one number (0-9).")
+    if not re.search(r"[^A-Za-z0-9]", v):
+        raise ValueError("Password must contain at least one special character (e.g. !@#$%^&*).")
+    return v
+
+
 class SignupIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = Field(default=None, max_length=100)
+
+    @field_validator("password")
+    @classmethod
+    def check_password_complexity(cls, v: str) -> str:
+        return validate_strong_password(v)
 
 
 class LoginIn(BaseModel):
@@ -54,6 +76,11 @@ class ForgotPasswordIn(BaseModel):
 class ResetPasswordIn(BaseModel):
     token: str = Field(min_length=10)
     new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def check_password_complexity(cls, v: str) -> str:
+        return validate_strong_password(v)
 
 
 class VerifyEmailIn(BaseModel):

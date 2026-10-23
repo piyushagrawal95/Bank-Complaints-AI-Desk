@@ -540,3 +540,87 @@ input[type="password"]::-ms-clear {
   display: inline-block;
 }
 
+/* =========================================
+   PASSWORD REQUIREMENTS CHECKLIST
+   ========================================= */
+.password-rules-box {
+  margin-top: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  animation: fadeInRules 0.2s ease-in-out;
+}
+
+@keyframes fadeInRules {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.password-rules-header {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.15rem;
+}
+
+.password-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  transition: all 0.18s ease;
+}
+
+.rule-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+}
+
+.rule-row.rule-unmet {
+  color: #dc2626;
+}
+
+.rule-row.rule-unmet .rule-badge {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.rule-row.rule-met {
+  color: #15803d;
+  font-weight: 500;
+}
+
+.rule-row.rule-met .rule-badge {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+

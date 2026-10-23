@@ -28,6 +28,29 @@ def test_complaints_unauthorized(client):
 def test_signup_validation(client):
     res = client.post("/auth/signup", json={"email": "test_invalid@bank.com", "password": "123"})
     assert res.status_code == 422
+    assert "8 characters" in res.json()["detail"]
+
+
+def test_signup_password_complexity(client):
+    # Missing uppercase
+    r1 = client.post("/auth/signup", json={"email": "u1@bank.com", "password": "password1@"})
+    assert r1.status_code == 422
+    assert "uppercase" in r1.json()["detail"].lower()
+
+    # Missing lowercase
+    r2 = client.post("/auth/signup", json={"email": "u2@bank.com", "password": "PASSWORD1@"})
+    assert r2.status_code == 422
+    assert "lowercase" in r2.json()["detail"].lower()
+
+    # Missing digit
+    r3 = client.post("/auth/signup", json={"email": "u3@bank.com", "password": "Password@@"})
+    assert r3.status_code == 422
+    assert "number" in r3.json()["detail"].lower() or "digit" in r3.json()["detail"].lower()
+
+    # Missing special character
+    r4 = client.post("/auth/signup", json={"email": "u4@bank.com", "password": "Password123"})
+    assert r4.status_code == 422
+    assert "special character" in r4.json()["detail"].lower()
 
 
 def test_login_invalid_credentials(client):
@@ -77,6 +100,8 @@ def get_admin_user():
         u = conn.execute("SELECT id, email, role FROM users WHERE email = 'piyushagrawal300504@gmail.com'").fetchone()
         if not u:
             u = conn.execute("SELECT id, email, role FROM users WHERE role = 'admin' LIMIT 1").fetchone()
+        if not u:
+            u = conn.execute("INSERT INTO users (email, password_hash, role, is_active) VALUES ('piyushagrawal300504@gmail.com', 'dummy_hash', 'admin', true) RETURNING id, email, role").fetchone()
         return u
 
 def get_agent_user():

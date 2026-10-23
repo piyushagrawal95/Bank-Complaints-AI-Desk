@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -37,6 +39,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for err in exc.errors():
+        loc = err.get("loc", [])
+        field = loc[-1] if loc and loc[-1] != "body" else ""
+        raw_msg = err.get("msg", "Invalid value")
+        clean_msg = raw_msg.replace("Value error, ", "").replace("Assertion error, ", "").strip()
+        if field:
+            clean_field = str(field).replace("_", " ").title()
+            if clean_field.lower() in clean_msg.lower():
+                errors.append(clean_msg)
+            else:
+                errors.append(f"{clean_field}: {clean_msg}")
+        else:
+            errors.append(clean_msg)
+
+    formatted_message = ". ".join(errors) if errors else "Invalid form values submitted."
+    return JSONResponse(
+        status_code=422,
+        content={"detail": formatted_message},
+    )
 
 app.include_router(auth.router)
 app.include_router(complaints.router)

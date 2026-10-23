@@ -42,6 +42,14 @@ function Login({ onLoggedIn }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
+  const passwordChecks = {
+    minLength: password.length >= 8,
+    hasUpper: /[A-Z]/.test(password),
+    hasLower: /[a-z]/.test(password),
+    hasDigit: /[0-9]/.test(password),
+    hasSpecial: /[^A-Za-z0-9]/.test(password),
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("reset_token") || params.get("token");
@@ -140,9 +148,52 @@ function Login({ onLoggedIn }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
     setSuccess(null);
+
+    // Client-side validation with specific, real error messages
+    if (mode === "signup" && !fullName.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
+
+    if (mode !== "reset") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email.trim() || !emailRegex.test(email.trim())) {
+        setError("Please enter a valid email address (e.g. name@bank.com).");
+        return;
+      }
+    }
+
+    if (mode === "reset" && !resetToken.trim()) {
+      setError("Please enter the verification reset token.");
+      return;
+    }
+
+    if (mode === "signup" || mode === "reset") {
+      if (!passwordChecks.minLength) {
+        setError("Password must be at least 8 characters long.");
+        return;
+      }
+      if (!passwordChecks.hasUpper) {
+        setError("Password must contain at least one uppercase letter (A-Z).");
+        return;
+      }
+      if (!passwordChecks.hasLower) {
+        setError("Password must contain at least one lowercase letter (a-z).");
+        return;
+      }
+      if (!passwordChecks.hasDigit) {
+        setError("Password must contain at least one number (0-9).");
+        return;
+      }
+      if (!passwordChecks.hasSpecial) {
+        setError("Password must contain at least one special character (!@#$%^&*...).");
+        return;
+      }
+    }
+
+    setLoading(true);
 
     try {
       if (mode === "signup") {
@@ -467,6 +518,34 @@ function Login({ onLoggedIn }) {
                     <EyeIcon off={showPassword} />
                   </button>
                 </div>
+
+                {(mode === "signup" || mode === "reset") && (
+                  <div className="password-rules-box">
+                    <div className="password-rules-header">Password Requirements:</div>
+                    <div className="password-rules-list">
+                      <div className={`rule-row ${passwordChecks.minLength ? "rule-met" : "rule-unmet"}`}>
+                        <span className="rule-badge">{passwordChecks.minLength ? "✓" : "✕"}</span>
+                        <span className="rule-text">At least 8 characters</span>
+                      </div>
+                      <div className={`rule-row ${passwordChecks.hasUpper ? "rule-met" : "rule-unmet"}`}>
+                        <span className="rule-badge">{passwordChecks.hasUpper ? "✓" : "✕"}</span>
+                        <span className="rule-text">At least one uppercase letter (A-Z)</span>
+                      </div>
+                      <div className={`rule-row ${passwordChecks.hasLower ? "rule-met" : "rule-unmet"}`}>
+                        <span className="rule-badge">{passwordChecks.hasLower ? "✓" : "✕"}</span>
+                        <span className="rule-text">At least one lowercase letter (a-z)</span>
+                      </div>
+                      <div className={`rule-row ${passwordChecks.hasDigit ? "rule-met" : "rule-unmet"}`}>
+                        <span className="rule-badge">{passwordChecks.hasDigit ? "✓" : "✕"}</span>
+                        <span className="rule-text">At least one number (0-9)</span>
+                      </div>
+                      <div className={`rule-row ${passwordChecks.hasSpecial ? "rule-met" : "rule-unmet"}`}>
+                        <span className="rule-badge">{passwordChecks.hasSpecial ? "✓" : "✕"}</span>
+                        <span className="rule-text">At least one special character (!@#$%^&*)</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

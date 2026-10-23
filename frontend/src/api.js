@@ -53,9 +53,30 @@ async function request(path, { method = "GET", params = {}, body } = {}) {
     let message = `Request failed (status ${response.status})`;
     try {
       const data = await response.json();
-      if (typeof data.detail === "string") message = data.detail;
-      else if (Array.isArray(data.detail)) {
-        message = "Validation error: please check the submitted form values.";
+      if (typeof data.detail === "string" && data.detail.trim()) {
+        message = data.detail;
+      } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+        const errorMsgs = data.detail.map((err) => {
+          let msg = err.msg || "Invalid value";
+          msg = msg.replace(/^Value error,\s*/i, "").replace(/^Assertion error,\s*/i, "");
+          const loc = Array.isArray(err.loc) ? err.loc : [];
+          const field = loc.length > 0 ? loc[loc.length - 1] : "";
+          if (field && field !== "body") {
+            const fieldName = String(field)
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase());
+            if (msg.toLowerCase().includes(fieldName.toLowerCase())) {
+              return msg;
+            }
+            return `${fieldName}: ${msg}`;
+          }
+          return msg;
+        });
+        message = errorMsgs.filter(Boolean).join(". ") || "Please verify the submitted form values.";
+      } else if (typeof data.message === "string" && data.message.trim()) {
+        message = data.message;
+      } else if (typeof data.error === "string" && data.error.trim()) {
+        message = data.error;
       }
     } catch {
       // response had no json body
