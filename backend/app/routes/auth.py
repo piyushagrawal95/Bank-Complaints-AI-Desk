@@ -286,8 +286,33 @@ def me(user=Depends(get_current_user)):
 
 
 def dispatch_email_transport(to_email: str, subject: str, html_content: str, text_content: str, client_origin: str | None = None) -> bool:
-    """Dispatches email via Vercel HTTPS Serverless Relay, HTTPS API (Resend / Brevo) or falls back to SMTP."""
-    # 1. Vercel Serverless Function Relay (HTTPS Port 443 -> Vercel Node.js -> Gmail Port 465)
+    """Dispatches email via Brevo HTTPS API, Vercel Relay, Resend, or falls back to SMTP."""
+    # 1. Brevo REST API (HTTPS Port 443 - Recommended for Render & Free Global Delivery)
+    brevo_key = os.getenv("BREVO_API_KEY", "").strip()
+    if brevo_key:
+        try:
+            sender_email = os.getenv("BREVO_SENDER_EMAIL", "").strip() or "piyushagrawal3005@gmail.com"
+            payload = json.dumps({
+                "sender": {"name": "Bank Complaint AI Desk", "email": sender_email},
+                "to": [{"email": to_email}],
+                "subject": subject,
+                "htmlContent": html_content,
+                "textContent": text_content,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.brevo.com/v3/smtp/email",
+                data=payload,
+                headers={"api-key": brevo_key, "Content-Type": "application/json", "User-Agent": "BankComplaintAIDesk/1.0"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status in (200, 201, 202):
+                    logger.info(f"Email successfully dispatched via Brevo HTTPS API to {to_email}")
+                    return True
+        except Exception as exc:
+            logger.warning(f"Brevo HTTPS dispatch failed for {to_email}: {exc}")
+
+    # 2. Vercel Serverless Function Relay (HTTPS Port 443 -> Vercel Node.js -> Gmail Port 465)
     # Bypasses Render outbound SMTP port blocking and sends to ANY recipient email worldwide via Gmail.
     relay_urls = []
     if client_origin and client_origin.startswith("http") and "localhost" not in client_origin and "127.0.0.1" not in client_origin:
@@ -375,29 +400,7 @@ def dispatch_email_transport(to_email: str, subject: str, html_content: str, tex
         except Exception as exc:
             logger.warning(f"Maileroo HTTPS dispatch failed: {exc}")
 
-    # 3. Brevo API (HTTPS Port 443)
-    brevo_key = os.getenv("BREVO_API_KEY", "").strip()
-    if brevo_key:
-        try:
-            sender_email = os.getenv("SMTP_FROM", "piyushagrawal300504@gmail.com")
-            payload = json.dumps({
-                "sender": {"name": "Bank Complaint AI Desk", "email": sender_email},
-                "to": [{"email": to_email}],
-                "subject": subject,
-                "htmlContent": html_content,
-                "textContent": text_content,
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                "https://api.brevo.com/v3/smtp/email",
-                data=payload,
-                headers={"api-key": brevo_key, "Content-Type": "application/json"},
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                logger.info(f"Email dispatched via Brevo HTTPS API to {to_email}")
-                return True
-        except Exception as exc:
-            logger.error(f"Brevo HTTPS dispatch failed: {exc}")
+
 
     # 3. Standard SMTP (Localhost / unblocked networks)
     smtp_user = os.getenv("SMTP_USER", "")
