@@ -345,7 +345,37 @@ def dispatch_email_transport(to_email: str, subject: str, html_content: str, tex
         except Exception as exc:
             logger.error(f"Resend HTTPS dispatch failed: {exc}")
 
-    # 2. Brevo API (HTTPS Port 443)
+    # 2. Maileroo API (HTTPS Port 443)
+    maileroo_key = os.getenv("MAILEROO_API_KEY", "").strip()
+    if maileroo_key:
+        try:
+            sender_email = os.getenv("MAILEROO_FROM", os.getenv("SMTP_FROM", "piyushagrawal300504@gmail.com"))
+            payload = json.dumps({
+                "from": {"email": sender_email, "name": "Bank Complaint AI Desk"},
+                "to": [{"email": to_email, "name": "Bank User"}],
+                "subject": subject,
+                "html": html_content,
+                "plain": text_content,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.maileroo.com/v1/emails",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {maileroo_key}",
+                    "X-API-Key": maileroo_key,
+                    "Content-Type": "application/json",
+                    "User-Agent": "BankComplaintAIDesk/1.0",
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status in (200, 201, 202):
+                    logger.info(f"Email dispatched via Maileroo HTTPS API to {to_email}")
+                    return True
+        except Exception as exc:
+            logger.warning(f"Maileroo HTTPS dispatch failed: {exc}")
+
+    # 3. Brevo API (HTTPS Port 443)
     brevo_key = os.getenv("BREVO_API_KEY", "").strip()
     if brevo_key:
         try:

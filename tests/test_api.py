@@ -79,6 +79,14 @@ def get_admin_user():
             u = conn.execute("SELECT id, email, role FROM users WHERE role = 'admin' LIMIT 1").fetchone()
         return u
 
+def get_agent_user():
+    from app.db import pool
+    with pool.connection() as conn:
+        u = conn.execute("SELECT id, email, role FROM users WHERE role = 'agent' LIMIT 1").fetchone()
+        if not u:
+            u = conn.execute("INSERT INTO users (email, password_hash, role, is_active) VALUES ('test_agent@bank.com', 'dummy_hash', 'agent', true) RETURNING id, email, role").fetchone()
+        return u
+
 def test_permanent_admin_protection(client):
     from app.security import create_access_token
     admin = get_admin_user()
@@ -110,7 +118,8 @@ def test_complaints_list_authenticated(client):
 def test_trends_spikes_rbac(client):
     from app.security import create_access_token
     admin = get_admin_user()
-    agent_token = create_access_token(user_id=12, role="agent")
+    agent = get_agent_user()
+    agent_token = create_access_token(user_id=agent["id"], role="agent")
     res_agent = client.get("/trends/spikes", headers={"Authorization": f"Bearer {agent_token}"})
     assert res_agent.status_code == 403
 
