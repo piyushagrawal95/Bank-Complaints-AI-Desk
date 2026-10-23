@@ -7,7 +7,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.15rem;
   flex-wrap: wrap;
   gap: 1rem;
 }
@@ -60,14 +60,48 @@
   background-color: #f8fafc;
 }
 
+/* Timeline Mode Switcher Tabs */
+.timeline-mode-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.mode-tab {
+  padding: 0.55rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid #cbd5e1;
+  border-bottom: none;
+  background: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mode-tab:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.mode-tab.active {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: #cbd5e1;
+  font-weight: 700;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.03);
+}
+
 /* Supervisory Timeline & Threshold Controls Panel */
 .timeline-panel {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 0 10px 10px 10px;
   padding: 1.15rem 1.35rem;
   margin-bottom: 1.35rem;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
 .timeline-row {
@@ -155,6 +189,102 @@
   font-size: 0.78rem;
   color: #475569;
   font-weight: 500;
+}
+
+/* Custom Date Range Builder (From - To) */
+.date-range-builder {
+  padding-bottom: 0.95rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.date-range-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.85rem;
+}
+
+.date-range-inputs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 0.85rem;
+}
+
+.date-field-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.date-field-group label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.date-range-picker {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.date-range-picker:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+}
+
+.date-range-arrow {
+  color: #94a3b8;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.date-shortcuts-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.shortcuts-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-right: 0.25rem;
+}
+
+.shortcut-chip {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.shortcut-chip:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.shortcut-chip.active {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+  font-weight: 700;
 }
 
 .timeline-secondary-row {

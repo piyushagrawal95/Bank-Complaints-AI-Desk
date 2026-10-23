@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -23,6 +23,8 @@ def spikes(
     threshold: float = Query(1.5, ge=1.0, le=10.0),
     min_count: int = Query(10, ge=1, le=100000),
     as_of: date | None = Query(None, description="Optional reference date (defaults to latest date)"),
+    date_from: date | None = Query(None, description="Optional custom start date"),
+    date_to: date | None = Query(None, description="Optional custom end date"),
 ):
     # Guard if invoked directly in test environments without FastAPI DI
     if hasattr(window_days, "default"):
@@ -35,6 +37,22 @@ def spikes(
         min_count = min_count.default
     if hasattr(as_of, "default"):
         as_of = as_of.default
+    if hasattr(date_from, "default"):
+        date_from = date_from.default
+    if hasattr(date_to, "default"):
+        date_to = date_to.default
+
+    # Custom Date Range logic: "is date se us date ke beech"
+    if date_from and date_to:
+        if date_from > date_to:
+            raise HTTPException(
+                status_code=400,
+                detail="Start date (date_from) must be before or equal to End date (date_to)",
+            )
+        window_days = max(1, min(180, (date_to - date_from).days + 1))
+        as_of = date_to
+    elif date_to and not date_from:
+        as_of = date_to
 
     column = GROUP_COLUMNS[group_by]
 
@@ -71,6 +89,8 @@ def spikes(
     if not rows:
         return {
             "as_of": as_of.isoformat() if as_of else None,
+            "date_from": date_from.isoformat() if date_from else None,
+            "date_to": date_to.isoformat() if date_to else None,
             "group_by": group_by,
             "window_days": window_days,
             "baseline_windows": baseline_windows,
@@ -111,8 +131,13 @@ def spikes(
 
     items.sort(key=lambda i: (not i["is_spike"], -(i["change_pct"] if i["change_pct"] is not None else 10**9)))
 
+    calculated_date_from = date_from or (max_date - timedelta(days=window_days - 1))
+    calculated_date_to = date_to or max_date
+
     return {
         "as_of": max_date.isoformat(),
+        "date_from": calculated_date_from.isoformat(),
+        "date_to": calculated_date_to.isoformat(),
         "group_by": group_by,
         "window_days": window_days,
         "baseline_windows": baseline_windows,
