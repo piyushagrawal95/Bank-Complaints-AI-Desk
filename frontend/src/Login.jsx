@@ -260,17 +260,17 @@ function Login({ onLoggedIn }) {
       } else if (mode === "forgot") {
         setLoadingMessage("Sending password reset instructions...");
         const res = await forgotPassword(email);
-        setSuccess(res.message);
-        if (res.dev_reset_token) {
-          setResetToken(res.dev_reset_token);
-          setMode("reset");
-        }
+        setSuccess(
+          res.message || "If this email is registered, a password reset link has been issued. Please check your inbox (and spam folder) to set your new password."
+        );
+        setEmail("");
       } else if (mode === "reset") {
         setLoadingMessage("Updating and securing your password...");
         const res = await resetPassword(resetToken, password);
         setMode("login");
         setPassword("");
-        setSuccess(res.message);
+        setResetToken("");
+        setSuccess(res.message || "Password updated successfully! You can now sign in with your new password.");
       }
     } catch (err) {
       setError(err.message);
@@ -371,7 +371,7 @@ function Login({ onLoggedIn }) {
                 ? "Fill in your details to create an account"
                 : mode === "forgot"
                 ? "Enter your email to receive a password reset link"
-                : "Enter your verification token and your new password"}
+                : "Create a new strong password for your account"}
             </p>
           </div>
 
@@ -477,7 +477,7 @@ function Login({ onLoggedIn }) {
               </div>
             )}
 
-            {mode === "reset" && (
+            {mode === "reset" && !resetToken && (
               <div className="auth-field">
                 <label>Verification Reset Token</label>
                 <input

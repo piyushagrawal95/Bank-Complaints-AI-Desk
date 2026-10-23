@@ -581,7 +581,6 @@ def forgot_password(body: ForgotPasswordIn, request: Request):
     logger.info(f"Password reset token issued for {email}")
     return {
         "message": "If this email is registered, a password reset link has been issued.",
-        "dev_reset_token": raw_token,  # returned for easy testing/demo
     }
 
 
