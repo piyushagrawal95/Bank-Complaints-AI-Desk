@@ -194,7 +194,8 @@ function AskRules() {
               onClick={() => handleQuickClick(text)}
               disabled={loading}
             >
-              <span>{text}</span>
+              <span className="chip-arrow">›</span>
+              <span className="chip-text">{text}</span>
             </button>
           ))}
         </div>
@@ -251,7 +252,6 @@ function AskRules() {
               >
                 {copied ? "✓ Copied!" : "📋 Copy Answer"}
               </button>
-              <span className="model-tag">Model: {result.model}</span>
             </div>
           </div>
 

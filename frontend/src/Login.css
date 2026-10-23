@@ -211,13 +211,13 @@
   flex: 1;
   background: transparent;
   border: none;
-  padding: 0.45rem 0.5rem;
-  font-size: 0.82rem;
+  padding: 0.5rem 0.55rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: #64748b;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.18s ease;
   text-align: center;
 }
 
@@ -227,7 +227,7 @@
 
 .mode-tab.active {
   background: #ffffff;
-  color: #0284c7;
+  color: #2563eb;
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
@@ -245,7 +245,7 @@
 }
 
 .auth-field label {
-  font-size: 0.84rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: #334155;
 }
@@ -260,32 +260,34 @@
   background: none;
   border: none;
   padding: 0;
-  color: #0284c7;
-  font-size: 0.8rem;
+  color: #3b82f6;
+  font-size: 0.88rem;
   font-weight: 500;
   cursor: pointer;
+  transition: all 0.18s ease;
 }
 
 .forgot-link:hover {
-  text-decoration: underline;
+  color: #60a5fa;
+  text-decoration: none;
 }
 
 .auth-input {
   width: 100%;
-  padding: 0.65rem 0.85rem;
-  font-size: 0.92rem;
+  padding: 0.68rem 0.85rem;
+  font-size: 0.94rem;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   background: #ffffff;
   color: #1e293b;
   font-family: inherit;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .auth-input:focus {
   outline: none;
-  border-color: #0284c7;
-  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.12);
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
 }
 
 /* Suppress native browser password reveal icons (Edge / Windows) */
@@ -330,19 +332,19 @@ input[type="password"]::-ms-clear {
 .auth-submit-btn {
   margin-top: 0.5rem;
   width: 100%;
-  padding: 0.75rem;
-  font-size: 0.92rem;
-  font-weight: 500;
-  background: #0284c7;
+  padding: 0.78rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: #2563eb;
   color: #ffffff;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color 0.18s ease;
 }
 
 .auth-submit-btn:hover:not(:disabled) {
-  background: #0369a1;
+  background: #3b82f6;
 }
 
 .auth-message {
@@ -366,27 +368,30 @@ input[type="password"]::-ms-clear {
 .auth-switch {
   margin-top: 1.5rem;
   text-align: center;
-  font-size: 0.86rem;
+  font-size: 0.94rem;
   color: #64748b;
 }
 
 .auth-switch p {
   margin: 0;
   color: #64748b;
-  font-size: 0.86rem;
+  font-size: 0.94rem;
 }
 
 .auth-link {
   background: none;
   border: none;
   padding: 0;
-  color: #0284c7;
-  font-weight: 500;
+  color: #3b82f6;
+  font-size: 0.94rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: color 0.18s ease;
 }
 
 .auth-link:hover {
-  text-decoration: underline;
+  color: #60a5fa;
+  text-decoration: none;
 }
 
 /* =========================================
