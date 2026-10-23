@@ -18,14 +18,19 @@ class AskRuleIn(BaseModel):
 
 
 SYSTEM_PROMPT = """You are an expert banking compliance assistant for a bank's complaint resolution team.
-Your job is to answer compliance questions clearly and authoritatively based on official federal banking regulations.
+Your job is to answer compliance questions clearly, authoritatively, and in a highly organized, bulleted structure based on official federal banking regulations.
 
-Rules:
-1. Base your answer strictly on the provided regulation excerpts. Do not invent rules.
-2. State the relevant regulation name and section naturally in your explanation (e.g. Under Regulation E § 1005.11...).
-3. Be concise, direct, and explain the exact rules, timeframes, deadlines, or customer rights in clean prose.
-4. Do NOT output raw source citations, source numbers ([Source 1]), or page lists at the end. Focus 100% on providing clean, helpful regulatory information.
-5. If the excerpts do not contain enough information, state:
+Formatting & Structure Guidelines:
+1. Core Summary: Begin with a concise 1-2 sentence direct summary stating the governing regulation and section (e.g. Regulation E § 1005.11, Regulation Z § 1026.13, Regulation F § 1006.6, Regulation V § 611).
+2. Structured Bullet Points: Break down the detailed operational rules into clean, categorized bullet points using "• ":
+   - • **Core Timeline & Deadlines:** Exact business days, calendar days, or prohibited hours (e.g., 10 business days, 30 days, 8:00 AM to 9:00 PM).
+   - • **Bank's Obligations:** Specific compliance duties (investigation, provisional credit, written disclosures, fee reversal).
+   - • **Consumer Rights & Protections:** Consumer notification rights, liability limits, and dispute procedures.
+   - • **Exceptions & Extensions (if applicable):** Specific exceptions for new accounts, point-of-sale, or international transactions.
+3. Readability: Bold critical figures and terms (e.g. **10 business days**, **provisional credit**, **Regulation E § 1005.11**). Keep points direct, concise, and scannable.
+4. Grounding: Base your answer strictly on the provided regulation excerpts. Do not invent rules.
+5. Citations: Seamlessly weave regulation names and sections into the text. Do NOT append raw citation brackets like [Source 1] or raw lists of sources at the end.
+6. If the excerpts do not contain enough information to answer, state:
    "The available regulation documents do not contain specific rules to answer this question."
 """
 
@@ -84,7 +89,7 @@ def ask_regulation_rule(body: AskRuleIn):
         f"Official Regulation Excerpts:\n\n"
         + "\n\n---\n\n".join(context_blocks)
         + f"\n\nEmployee Question: {question}\n\n"
-        + "Please provide a direct, informative answer explaining the rule and requirements clearly."
+        + "Please provide an efficient, structured answer with a clear summary followed by categorized bullet points highlighting key requirements, timelines, and consumer protections."
     )
 
     messages = [
@@ -93,7 +98,7 @@ def ask_regulation_rule(body: AskRuleIn):
     ]
 
     try:
-        answer = chat(messages, temperature=0.1, max_tokens=700)
+        answer = chat(messages, temperature=0.1, max_tokens=750)
     except LLMError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 

@@ -23,6 +23,7 @@ import {
 } from "./Icons";
 
 const EMPTY = { q: "", product: "", state: "", date_from: "", date_to: "" };
+const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || "").toLowerCase();
 const PAGE_SIZE = 25;
 const TREND_ROLES = ["supervisor", "admin"];
 const ADMIN_ROLES = ["admin"];
@@ -468,7 +469,7 @@ function App() {
               <div className="user-details">
                 <span className="user-name">{user.full_name || user.email}</span>
                 <span className={`badge badge-${user.role}`}>
-                  {user.email.toLowerCase() === "piyushagrawal300504@gmail.com"
+                  {SUPER_ADMIN_EMAIL && user.email.toLowerCase() === SUPER_ADMIN_EMAIL
                     ? "👑 Super Admin"
                     : user.role}
                 </span>
@@ -619,7 +620,7 @@ function App() {
                 <span className="profile-lbl">System Role:</span>
                 <span className="profile-val">
                   <span className={`badge badge-${user.role}`}>
-                    {user.email.toLowerCase() === "piyushagrawal300504@gmail.com"
+                    {SUPER_ADMIN_EMAIL && user.email.toLowerCase() === SUPER_ADMIN_EMAIL
                       ? "👑 Permanent Super Admin"
                       : user.role.toUpperCase()}
                   </span>

@@ -103,10 +103,11 @@ function Login({ onLoggedIn }) {
 
   useEffect(() => {
     function renderGoogleBtn() {
-      if (!window.google || (mode !== "login" && mode !== "signup")) return;
+      const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      if (!window.google || !googleClientId || (mode !== "login" && mode !== "signup")) return;
       try {
         window.google.accounts.id.initialize({
-          client_id: "639319834126-b1ouen3no25o2elim13idbab182m3tjd.apps.googleusercontent.com",
+          client_id: googleClientId,
           callback: handleGoogleSuccess,
           auto_select: false,
           cancel_on_tap_outside: true,
@@ -429,7 +430,7 @@ function Login({ onLoggedIn }) {
                   className="auth-input"
                   type="text"
                   required
-                  placeholder="e.g. Piyush Agrawal"
+                  placeholder="e.g. Alex Morgan"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   autoComplete="off"

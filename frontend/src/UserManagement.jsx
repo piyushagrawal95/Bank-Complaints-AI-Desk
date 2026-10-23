@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { getUsers, updateUserRole } from "./api";
 import "./UserManagement.css";
 
+const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || "").toLowerCase();
+
 function UserManagement({ currentUser }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +111,7 @@ function UserManagement({ currentUser }) {
                     <td>
                       <span className="user-name-cell">{u.full_name || "User"}</span>
                       {isCurrent && <span className="you-pill">You</span>}
-                      {u.email.toLowerCase() === "piyushagrawal300504@gmail.com" && (
+                      {SUPER_ADMIN_EMAIL && u.email.toLowerCase() === SUPER_ADMIN_EMAIL && (
                         <span className="root-admin-pill" title="System Founder & Permanent Root Administrator">
                           👑 Owner
                         </span>
@@ -125,7 +127,7 @@ function UserManagement({ currentUser }) {
                       <span className="status-pill active-pill">Active</span>
                     </td>
                     <td>
-                      {u.email.toLowerCase() === "piyushagrawal300504@gmail.com" ? (
+                      {SUPER_ADMIN_EMAIL && u.email.toLowerCase() === SUPER_ADMIN_EMAIL ? (
                         <span className="super-admin-lock-tag" title="Root Super Admin (Role is permanently locked)">
                           🔒 Permanent Admin
                         </span>

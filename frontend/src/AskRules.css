@@ -135,6 +135,7 @@
   background: var(--primary);
   color: white;
   border: none;
+  cursor: pointer;
 }
 
 .rules-submit:hover:not(:disabled) {
@@ -167,10 +168,10 @@
 .result-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 1.6rem 1.75rem;
   margin-top: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
   animation: fadeIn 0.2s ease-out;
 }
 
@@ -182,20 +183,72 @@
 .result-meta {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 1.15rem;
+  margin-bottom: 1.2rem;
   align-items: center;
   flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.meta-left {
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .grounded-badge {
   background: #f0fdf4;
   color: #166534;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.22rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid #bbf7d0;
+}
+
+.reg-detected-badge {
+  background: #eff6ff;
+  color: #1e40af;
   font-size: 0.76rem;
   font-weight: 600;
   padding: 0.2rem 0.6rem;
   border-radius: 6px;
-  border: 1px solid #bbf7d0;
+  border: 1px solid #bfdbfe;
+}
+
+.meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.copy-answer-btn {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.copy-answer-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.copy-answer-btn.copied {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
 }
 
 .model-tag {
@@ -204,40 +257,172 @@
   font-weight: 600;
 }
 
-.answer-text {
-  font-size: 1.05rem;
-  line-height: 1.7;
-  color: #0f172a;
-  white-space: pre-line;
+/* Compliance Answer Body Formatting */
+.compliance-answer-body {
   margin-bottom: 1.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
 }
 
-.answer-text strong {
-  color: #1e3a8a;
+.answer-summary-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.35rem;
 }
 
-.citations-section h3 {
-  font-size: 0.95rem;
-  color: #475569;
-  margin: 0 0 1rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+.summary-badge-title {
+  font-size: 0.76rem;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+}
+
+.summary-icon {
+  font-size: 0.95rem;
+}
+
+.summary-text-lead {
+  font-size: 1.02rem;
+  line-height: 1.65;
+  color: #0f172a;
+  margin: 0;
+}
+
+.summary-text-lead strong {
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.answer-section-heading {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 1.25rem 0 0.65rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.answer-section-heading::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+.answer-paragraph {
+  font-size: 0.96rem;
+  line-height: 1.65;
+  color: #334155;
+  margin: 0.6rem 0;
+}
+
+.answer-paragraph strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.compliance-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 1.2rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.compliance-bullet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.15s ease;
+}
+
+.compliance-bullet-item:hover {
+  background: #fbfcfe;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.bullet-icon-wrapper {
+  flex-shrink: 0;
+  margin-top: 0.45rem;
+}
+
+.bullet-dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+.bullet-body {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #1e293b;
+  flex: 1;
+}
+
+.bullet-body strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* Citations Section */
+.citations-wrapper {
+  margin-top: 1.25rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.citations-toggle-btn {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 0.45rem 0.9rem;
+  border-radius: 7px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.citations-toggle-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.citations-section {
+  margin-top: 1rem;
+  animation: fadeIn 0.2s ease-out;
 }
 
 .citations-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 0.9rem;
 }
 
 .citation-card {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 1rem 1.15rem;
+  border-radius: 9px;
+  padding: 0.9rem 1.1rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
@@ -255,21 +440,25 @@
   border-radius: 4px;
 }
 
+.badge-regulation-e,
 .badge-reg-e {
   background: #eff6ff;
   color: #1d4ed8;
 }
 
+.badge-regulation-f,
 .badge-reg-f {
   background: #faf5ff;
   color: #7e22ce;
 }
 
+.badge-regulation-v,
 .badge-reg-v {
   background: #f0fdfa;
   color: #0f766e;
 }
 
+.badge-regulation-z,
 .badge-reg-z {
   background: #eef2ff;
   color: #4338ca;
@@ -278,7 +467,7 @@
 .citation-section {
   font-weight: 700;
   color: #1e293b;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   margin-bottom: 0.35rem;
 }
 
@@ -292,7 +481,7 @@
   color: #475569;
   font-size: 0.84rem;
   line-height: 1.5;
-  margin: 0.4rem 0 0.65rem;
+  margin: 0.4rem 0 0.5rem;
   font-style: italic;
   background: white;
   padding: 0.5rem 0.65rem;

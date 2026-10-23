@@ -95,13 +95,15 @@ def test_google_login_mock_token(client):
 
 
 def get_admin_user():
+    from app.core.config import settings
     from app.db import pool
+    super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
     with pool.connection() as conn:
-        u = conn.execute("SELECT id, email, role FROM users WHERE email = 'piyushagrawal300504@gmail.com'").fetchone()
+        u = conn.execute("SELECT id, email, role FROM users WHERE email = %s", [super_admin]).fetchone()
         if not u:
             u = conn.execute("SELECT id, email, role FROM users WHERE role = 'admin' LIMIT 1").fetchone()
         if not u:
-            u = conn.execute("INSERT INTO users (email, password_hash, role, is_active) VALUES ('piyushagrawal300504@gmail.com', 'dummy_hash', 'admin', true) RETURNING id, email, role").fetchone()
+            u = conn.execute("INSERT INTO users (email, password_hash, role, is_active) VALUES (%s, 'dummy_hash', 'admin', true) RETURNING id, email, role", [super_admin]).fetchone()
         return u
 
 def get_agent_user():

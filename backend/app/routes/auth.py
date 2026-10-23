@@ -206,12 +206,14 @@ def login(body: LoginIn):
         },
     }
 
-DEFAULT_GOOGLE_CLIENT_ID = "639319834126-b1ouen3no25o2elim13idbab182m3tjd.apps.googleusercontent.com"
-
-
 @router.post("/google")
 def login_with_google(body: GoogleLoginIn):
-    client_id = (os.getenv("GOOGLE_CLIENT_ID") or "").strip() or DEFAULT_GOOGLE_CLIENT_ID
+    client_id = (os.getenv("GOOGLE_CLIENT_ID") or settings.google_client_id or "").strip()
+    if not client_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID in backend/.env",
+        )
 
     idinfo = None
     verification_error = None
@@ -315,10 +317,12 @@ def me(user=Depends(get_current_user)):
 def dispatch_email_transport(to_email: str, subject: str, html_content: str, text_content: str, client_origin: str | None = None) -> bool:
     """Dispatches email via Brevo HTTPS API, Vercel Relay, Resend, or falls back to SMTP."""
     # 1. Brevo REST API (HTTPS Port 443 - Recommended for Render & Free Global Delivery)
-    brevo_key = os.getenv("BREVO_API_KEY", "").strip()
+    brevo_key = (os.getenv("BREVO_API_KEY") or settings.brevo_api_key or "").strip()
     if brevo_key:
         try:
-            sender_email = os.getenv("BREVO_SENDER_EMAIL", "").strip() or "piyushagrawal3005@gmail.com"
+            sender_email = (os.getenv("BREVO_SENDER_EMAIL") or settings.brevo_sender_email or "").strip()
+            if not sender_email:
+                raise ValueError("BREVO_SENDER_EMAIL is not configured in .env")
             payload = json.dumps({
                 "sender": {"name": "Bank Complaint AI Desk", "email": sender_email},
                 "to": [{"email": to_email}],
@@ -374,10 +378,10 @@ def dispatch_email_transport(to_email: str, subject: str, html_content: str, tex
         except Exception as exc:
             logger.warning(f"Vercel serverless relay ({relay_url}) failed: {exc}")
     # 1. Resend API (HTTPS Port 443 - Recommended for Render & Vercel)
-    resend_key = os.getenv("RESEND_API_KEY", "").strip()
+    resend_key = (os.getenv("RESEND_API_KEY") or settings.resend_api_key or "").strip()
     if resend_key:
         try:
-            from_addr = os.getenv("RESEND_FROM", "Bank Complaint Desk <onboarding@resend.dev>")
+            from_addr = (os.getenv("RESEND_FROM") or settings.resend_from or "Bank Complaint Desk <onboarding@resend.dev>").strip()
             payload = json.dumps({
                 "from": from_addr,
                 "to": [to_email],
@@ -398,10 +402,12 @@ def dispatch_email_transport(to_email: str, subject: str, html_content: str, tex
             logger.error(f"Resend HTTPS dispatch failed: {exc}")
 
     # 2. Maileroo API (HTTPS Port 443)
-    maileroo_key = os.getenv("MAILEROO_API_KEY", "").strip()
+    maileroo_key = (os.getenv("MAILEROO_API_KEY") or settings.maileroo_api_key or "").strip()
     if maileroo_key:
         try:
-            sender_email = os.getenv("MAILEROO_FROM", os.getenv("SMTP_FROM", "piyushagrawal300504@gmail.com"))
+            sender_email = (os.getenv("MAILEROO_FROM") or settings.maileroo_from or os.getenv("SMTP_FROM") or settings.smtp_from or "").strip()
+            if not sender_email:
+                raise ValueError("Sender email is not configured for Maileroo in .env")
             payload = json.dumps({
                 "from": {"email": sender_email, "name": "Bank Complaint AI Desk"},
                 "to": [{"email": to_email, "name": "Bank User"}],
@@ -430,11 +436,11 @@ def dispatch_email_transport(to_email: str, subject: str, html_content: str, tex
 
 
     # 3. Standard SMTP (Localhost / unblocked networks)
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    smtp_from = os.getenv("SMTP_FROM", smtp_user)
+    smtp_user = (os.getenv("SMTP_USER") or settings.smtp_user or "").strip()
+    smtp_password = (os.getenv("SMTP_PASSWORD") or settings.smtp_password or "").strip()
+    smtp_host = (os.getenv("SMTP_HOST") or settings.smtp_host or "smtp.gmail.com").strip()
+    smtp_port = int(os.getenv("SMTP_PORT") or settings.smtp_port or 587)
+    smtp_from = (os.getenv("SMTP_FROM") or settings.smtp_from or smtp_user).strip()
 
     if not smtp_user or not smtp_password:
         logger.info(f"SMTP/API not configured. Skipped email dispatch to {to_email}")
@@ -638,10 +644,11 @@ def update_user_role(body: RoleUpdateIn, admin=Depends(require_role("admin"))):
                 raise HTTPException(status_code=404, detail="User not found")
 
             # Permanent Root Super Admin Protection: Cannot be demoted or changed by anyone
-            if target["email"].lower() == "piyushagrawal300504@gmail.com" and body.role != "admin":
+            super_admin = (settings.super_admin_email or "").strip().lower()
+            if super_admin and target["email"].lower() == super_admin and body.role != "admin":
                 raise HTTPException(
                     status_code=403,
-                    detail="The root Super Admin (piyushagrawal300504@gmail.com) cannot be modified or demoted by any user."
+                    detail=f"The root Super Admin ({target['email']}) cannot be modified or demoted by any user."
                 )
 
             row = conn.execute(

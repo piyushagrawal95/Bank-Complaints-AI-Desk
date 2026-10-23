@@ -26,13 +26,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing to_email parameter" });
   }
 
-  const smtpUser = process.env.SMTP_USER || "piyushagrawal300504@gmail.com";
-  const smtpPass = process.env.SMTP_PASSWORD || "kiraqahadvzsnxok";
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASSWORD;
+  const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+  const smtpPort = Number(process.env.SMTP_PORT || 465);
+
+  if (!smtpUser || !smtpPass) {
+    return res.status(500).json({ error: "SMTP credentials are not configured in environment variables." });
+  }
 
   const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
     auth: {
       user: smtpUser,
       pass: smtpPass,

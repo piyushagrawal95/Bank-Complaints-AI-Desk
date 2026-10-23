@@ -2,6 +2,7 @@ import logging
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.core.config import settings
 from app.db import pool
 from app.security import decode_access_token
 
@@ -36,8 +37,9 @@ def get_current_user(creds: HTTPAuthorizationCredentials | None = Depends(bearer
     if user is None:
         raise HTTPException(status_code=401, detail="Account not found")
 
-    # Enforce permanent super admin rights
-    if user["email"].lower() == "piyushagrawal300504@gmail.com":
+    # Enforce permanent super admin rights from environment config
+    super_admin = (settings.super_admin_email or "").strip().lower()
+    if super_admin and user["email"].lower() == super_admin:
         user["role"] = "admin"
         user["is_active"] = True
 
