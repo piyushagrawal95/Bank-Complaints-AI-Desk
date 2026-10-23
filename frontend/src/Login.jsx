@@ -102,9 +102,33 @@ function Login({ onLoggedIn }) {
   }
 
   useEffect(() => {
+    let retryTimer = null;
+    let attempts = 0;
+
     function renderGoogleBtn() {
-      const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      if (!window.google || !googleClientId || (mode !== "login" && mode !== "signup")) return;
+      if (mode !== "login" && mode !== "signup") return;
+
+      const googleClientId =
+        import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+        "639319834126-b1ouen3no25o2elim13idbab182m3tjd.apps.googleusercontent.com";
+
+      if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+        if (attempts < 50) {
+          attempts++;
+          retryTimer = setTimeout(renderGoogleBtn, 100);
+        }
+        return;
+      }
+
+      const btnContainer = document.getElementById("googleBtn");
+      if (!btnContainer) {
+        if (attempts < 50) {
+          attempts++;
+          retryTimer = setTimeout(renderGoogleBtn, 50);
+        }
+        return;
+      }
+
       try {
         window.google.accounts.id.initialize({
           client_id: googleClientId,
@@ -116,35 +140,26 @@ function Login({ onLoggedIn }) {
         // Disable automatic one-tap credential caching so user can always choose accounts
         window.google.accounts.id.disableAutoSelect();
 
-        const btnContainer = document.getElementById("googleBtn");
-        if (btnContainer) {
-          btnContainer.innerHTML = "";
-          const targetWidth = Math.min(380, btnContainer.offsetWidth || 360);
-          window.google.accounts.id.renderButton(btnContainer, {
-            theme: "outline",
-            size: "large",
-            width: targetWidth,
-            text: "continue_with",
-            shape: "rectangular",
-            logo_alignment: "left",
-          });
-        }
+        btnContainer.innerHTML = "";
+        const targetWidth = Math.min(380, btnContainer.offsetWidth || 360);
+        window.google.accounts.id.renderButton(btnContainer, {
+          theme: "outline",
+          size: "large",
+          width: targetWidth,
+          text: "continue_with",
+          shape: "rectangular",
+          logo_alignment: "left",
+        });
       } catch (e) {
         console.error("Google Auth render error:", e);
       }
     }
 
-    if (window.google) {
-      renderGoogleBtn();
-    } else {
-      const timer = setInterval(() => {
-        if (window.google) {
-          clearInterval(timer);
-          renderGoogleBtn();
-        }
-      }, 100);
-      return () => clearInterval(timer);
-    }
+    renderGoogleBtn();
+
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [mode]);
 
   async function handleSubmit(e) {
