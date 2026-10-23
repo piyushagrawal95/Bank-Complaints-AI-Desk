@@ -10,7 +10,11 @@ from email.mime.text import MIMEText
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+import json
+import urllib.request
+import urllib.error
+from urllib.parse import urlparse
 from pydantic import BaseModel, EmailStr, Field
 
 from app.core.config import settings
@@ -62,7 +66,7 @@ class RoleUpdateIn(BaseModel):
 
 
 @router.post("/signup", status_code=201)
-def signup(body: SignupIn):
+def signup(body: SignupIn, request: Request):
     email = body.email.lower()
     try:
         with pool.connection() as conn:
@@ -79,18 +83,32 @@ def signup(body: SignupIn):
     if row is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
-    # Send welcome email asynchronously / gracefully
+    # Dynamically resolve client origin for Vercel vs Localhost
+    origin = request.headers.get("origin")
+    if not origin and request.headers.get("referer"):
+        parsed = urlparse(request.headers.get("referer"))
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+    client_origin = (origin or settings.frontend_origin).rstrip("/")
+
+    email_sent = False
+    confirm_link = None
     try:
         print(f"\n==========================================")
         print(f"[MAIL SENDER] Sending confirmation to: {row['email']}")
-        link = send_confirmation_email(row["email"], row["full_name"])
-        print(f"[MAIL SENDER] SUCCESS! Verification link: {link}")
+        email_sent, confirm_link = send_confirmation_email(row["email"], row["full_name"], client_origin=client_origin)
+        print(f"[MAIL SENDER] Status email_sent={email_sent} | Verification link: {confirm_link}")
         print(f"==========================================\n")
     except Exception as exc:
         print(f"[MAIL ERROR] Failed to send email: {exc}")
 
+    msg = "Account created successfully! You can now sign in with your credentials."
+    if email_sent:
+        msg = "Account created successfully! A confirmation email has been dispatched to your inbox (check Spam/Junk if not visible)."
+
     return {
-        "message": "Account created successfully! You can now sign in with your credentials.",
+        "message": msg,
+        "email_sent": email_sent,
+        "dev_verification_link": confirm_link,
     }
 
 
@@ -266,8 +284,93 @@ def login_with_google(body: GoogleLoginIn):
 def me(user=Depends(get_current_user)):
     return user
 
-def send_confirmation_email(to_email: str, full_name: str | None = None) -> str:
-    """Sends an account activation link via Maileroo with dual-port retry and returns link."""
+
+def dispatch_email_transport(to_email: str, subject: str, html_content: str, text_content: str) -> bool:
+    """Dispatches email via HTTPS API (Resend / Brevo) or falls back to SMTP."""
+    # 1. Resend API (HTTPS Port 443 - Recommended for Render & Vercel)
+    resend_key = os.getenv("RESEND_API_KEY", "").strip()
+    if resend_key:
+        try:
+            from_addr = os.getenv("RESEND_FROM", "Bank Complaint Desk <onboarding@resend.dev>")
+            payload = json.dumps({
+                "from": from_addr,
+                "to": [to_email],
+                "subject": subject,
+                "html": html_content,
+                "text": text_content,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=payload,
+                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                logger.info(f"Email dispatched via Resend HTTPS API to {to_email}")
+                return True
+        except Exception as exc:
+            logger.error(f"Resend HTTPS dispatch failed: {exc}")
+
+    # 2. Brevo API (HTTPS Port 443)
+    brevo_key = os.getenv("BREVO_API_KEY", "").strip()
+    if brevo_key:
+        try:
+            sender_email = os.getenv("SMTP_FROM", "piyushagrawal300504@gmail.com")
+            payload = json.dumps({
+                "sender": {"name": "Bank Complaint AI Desk", "email": sender_email},
+                "to": [{"email": to_email}],
+                "subject": subject,
+                "htmlContent": html_content,
+                "textContent": text_content,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.brevo.com/v3/smtp/email",
+                data=payload,
+                headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                logger.info(f"Email dispatched via Brevo HTTPS API to {to_email}")
+                return True
+        except Exception as exc:
+            logger.error(f"Brevo HTTPS dispatch failed: {exc}")
+
+    # 3. Standard SMTP (Localhost / unblocked networks)
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_from = os.getenv("SMTP_FROM", smtp_user)
+
+    if not smtp_user or not smtp_password:
+        logger.info(f"SMTP/API not configured. Skipped email dispatch to {to_email}")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
+    msg["To"] = to_email
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=smtp_from.split("@")[-1])
+    msg.attach(MIMEText(text_content, "plain"))
+    msg.attach(MIMEText(html_content, "html"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=5) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_from, to_email, msg.as_string())
+        logger.info(f"Email sent to {to_email} via SMTP ({smtp_host}:{smtp_port})")
+        return True
+    except Exception as exc:
+        logger.warning(
+            f"SMTP dispatch to {to_email} failed: {exc}. Note: Cloud platforms like Render block outbound SMTP ports (587/465). Use RESEND_API_KEY in Render environment."
+        )
+        return False
+
+
+def send_confirmation_email(to_email: str, full_name: str | None = None, client_origin: str | None = None) -> tuple[bool, str]:
+    """Sends an account activation link using multi-transport dispatch."""
     verify_token = jwt.encode(
         {
             "email": to_email,
@@ -277,17 +380,8 @@ def send_confirmation_email(to_email: str, full_name: str | None = None) -> str:
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
-    confirm_link = f"{settings.frontend_origin}/?verify_email={verify_token}"
-
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    smtp_from = os.getenv("SMTP_FROM", smtp_user)
-
-    if not smtp_user or not smtp_password:
-        logger.info(f"SMTP not configured. Skipped confirmation email for {to_email}")
-        return confirm_link
+    base_origin = (client_origin or settings.frontend_origin).rstrip("/")
+    confirm_link = f"{base_origin}/?verify_email={verify_token}"
 
     name_display = full_name if full_name else "Bank Associate"
     subject = "Confirm Your Account - Bank Complaint AI Desk"
@@ -309,53 +403,15 @@ def send_confirmation_email(to_email: str, full_name: str | None = None) -> str:
     </html>
     """
     confirm_plain = f"Hello {name_display},\n\nThank you for registering for Bank Complaint AI Desk.\nPlease verify your account by clicking the link below:\n{confirm_link}\n\nThis confirmation link expires in 24 hours.\n"
-    msg = MIMEMultipart("alternative")
-    msg["Date"] = formatdate(localtime=True)
-    msg["Message-ID"] = make_msgid(domain=smtp_from.split("@")[-1])
-    msg.attach(MIMEText(confirm_plain, "plain"))
-    msg["Subject"] = subject
-    msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_content, "html"))
-
-    # Dual-port fallback: try primary port (587), fallback to 2525 if blocked by host
-    ports_to_try = [smtp_port]
-    if 2525 not in ports_to_try:
-        ports_to_try.append(2525)
-
-    sent = False
-    for p in ports_to_try:
-        try:
-            with smtplib.SMTP(smtp_host, p, timeout=8) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.sendmail(smtp_from, to_email, msg.as_string())
-            logger.info(f"Confirmation email sent to {to_email} via port {p}")
-            sent = True
-            break
-        except Exception as exc:
-            logger.warning(f"SMTP dispatch on port {p} failed: {exc}")
-
-    if not sent:
-        logger.error(f"Failed to dispatch email to {to_email} on ports {ports_to_try}")
-
-    return confirm_link
+    
+    sent = dispatch_email_transport(to_email, subject, html_content, confirm_plain)
+    return sent, confirm_link
 
 
-def send_password_reset_email(to_email: str, raw_token: str):
+def send_password_reset_email(to_email: str, raw_token: str, client_origin: str | None = None) -> bool:
     """Sends a professional password reset email with a 15-minute secure link."""
-    frontend_url = settings.frontend_origin
-    reset_link = f"{frontend_url}/?reset_token={raw_token}"
-
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    smtp_from = os.getenv("SMTP_FROM", smtp_user)
-
-    if not smtp_user or not smtp_password:
-        logger.info(f"SMTP not configured in .env. Dev password reset link for {to_email}: {reset_link}")
-        return
+    base_origin = (client_origin or settings.frontend_origin).rstrip("/")
+    reset_link = f"{base_origin}/?reset_token={raw_token}"
 
     subject = "Reset Your Password - Bank Complaint AI Desk"
     html_content = f"""
@@ -375,29 +431,12 @@ def send_password_reset_email(to_email: str, raw_token: str):
       </body>
     </html>
     """
+    reset_plain = f"Hello,\n\nPlease reset your Bank Complaint AI Desk password by clicking the link below:\n{reset_link}\n\nThis security link is valid for 15 minutes.\n"
 
-    reset_plain = f"Hello,\n\nPlease reset your password by clicking the link below:\n{reset_link}\n\nThis security link is valid for 15 minutes.\n"
-    msg = MIMEMultipart("alternative")
-    msg["Date"] = formatdate(localtime=True)
-    msg["Message-ID"] = make_msgid(domain=smtp_from.split("@")[-1])
-    msg.attach(MIMEText(reset_plain, "plain"))
-    msg["Subject"] = subject
-    msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_content, "html"))
-
-    try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_from, to_email, msg.as_string())
-        logger.info(f"Password reset email sent to {to_email}")
-    except Exception as exc:
-        logger.exception(f"Failed to dispatch reset email via SMTP: {exc}")
-
+    return dispatch_email_transport(to_email, subject, html_content, reset_plain)
 
 @router.post("/forgot-password")
-def forgot_password(body: ForgotPasswordIn):
+def forgot_password(body: ForgotPasswordIn, request: Request):
     """Generates a secure password reset token with 15 minutes validity."""
     email = body.email.lower()
     try:
@@ -419,8 +458,15 @@ def forgot_password(body: ForgotPasswordIn):
         logger.exception("Error creating reset token")
         raise HTTPException(status_code=503, detail="Database is unavailable. Please try again.")
 
+    # Dynamically resolve client origin for Vercel vs Localhost
+    origin = request.headers.get("origin")
+    if not origin and request.headers.get("referer"):
+        parsed = urlparse(request.headers.get("referer"))
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+    client_origin = (origin or settings.frontend_origin).rstrip("/")
+
     # Dispatch email
-    send_password_reset_email(email, raw_token)
+    sent = send_password_reset_email(email, raw_token, client_origin=client_origin)
     logger.info(f"Password reset token issued for {email}")
     return {
         "message": "If this email is registered, a password reset link has been issued.",

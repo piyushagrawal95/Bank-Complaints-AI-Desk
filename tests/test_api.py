@@ -70,17 +70,26 @@ def test_google_login_mock_token(client):
     assert data["user"]["email"] == "test_google_runner@bank.com"
 
 
+
+def get_admin_user():
+    from app.db import pool
+    with pool.connection() as conn:
+        u = conn.execute("SELECT id, email, role FROM users WHERE email = 'piyushagrawal300504@gmail.com'").fetchone()
+        if not u:
+            u = conn.execute("SELECT id, email, role FROM users WHERE role = 'admin' LIMIT 1").fetchone()
+        return u
+
 def test_permanent_admin_protection(client):
     from app.security import create_access_token
-    # Admin token
-    admin_token = create_access_token(user_id=26, role="admin")
+    admin = get_admin_user()
+    admin_token = create_access_token(user_id=admin["id"], role="admin")
     headers = {"Authorization": f"Bearer {admin_token}"}
 
-    # Attempt to demote user 11 (piyushagrawal300504@gmail.com)
+    # Attempt to demote root super admin
     res = client.put(
         "/auth/users/role",
         headers=headers,
-        json={"user_id": 26, "role": "agent"},
+        json={"user_id": admin["id"], "role": "agent"},
     )
     assert res.status_code == 403
     assert "cannot be modified or demoted" in res.json()["detail"]
@@ -88,7 +97,8 @@ def test_permanent_admin_protection(client):
 
 def test_complaints_list_authenticated(client):
     from app.security import create_access_token
-    token = create_access_token(user_id=26, role="admin")
+    admin = get_admin_user()
+    token = create_access_token(user_id=admin["id"], role="admin")
     res = client.get("/complaints?page=1&page_size=5", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     data = res.json()
@@ -99,11 +109,12 @@ def test_complaints_list_authenticated(client):
 
 def test_trends_spikes_rbac(client):
     from app.security import create_access_token
+    admin = get_admin_user()
     agent_token = create_access_token(user_id=12, role="agent")
     res_agent = client.get("/trends/spikes", headers={"Authorization": f"Bearer {agent_token}"})
     assert res_agent.status_code == 403
 
-    admin_token = create_access_token(user_id=26, role="admin")
+    admin_token = create_access_token(user_id=admin["id"], role="admin")
     res_admin = client.get("/trends/spikes", headers={"Authorization": f"Bearer {admin_token}"})
     assert res_admin.status_code == 200
     assert "items" in res_admin.json()
@@ -111,7 +122,8 @@ def test_trends_spikes_rbac(client):
 
 def test_similar_complaints_search(client):
     from app.security import create_access_token
-    token = create_access_token(user_id=26, role="admin")
+    admin = get_admin_user()
+    token = create_access_token(user_id=admin["id"], role="admin")
     res = client.get("/complaints/2026100000/similar?top_k=3", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     data = res.json()
