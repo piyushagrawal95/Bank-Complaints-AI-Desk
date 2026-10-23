@@ -5,11 +5,8 @@ import sys
 from dotenv import load_dotenv
 import psycopg
 
-# Load environment variables from backend/.env or root .env
-for env_path in ["backend/.env", ".env"]:
-    if os.path.exists(env_path):
-        load_dotenv(env_path)
-        break
+from pathlib import Path
+load_dotenv(Path(__file__).resolve().parent.parent / "backend" / ".env")
 
 db_url = os.getenv("DATABASE_URL")
 if not db_url:

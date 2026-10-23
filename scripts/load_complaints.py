@@ -30,7 +30,8 @@ OPTIONAL_CSV_COLUMNS = {"Consumer complaint narrative"}
 INSERT_SQL = (
     f"INSERT INTO complaints ({', '.join(DB_COLUMNS)}) "
     f"VALUES ({', '.join(['%s'] * len(DB_COLUMNS))}) "
-    "ON CONFLICT (complaint_id) DO NOTHING"
+    "ON CONFLICT (complaint_id) DO UPDATE SET "
+    "narrative = COALESCE(EXCLUDED.narrative, complaints.narrative)"
 )
 
 
@@ -41,6 +42,7 @@ def clean(chunk):
             chunk[col] = None
     chunk = chunk[DB_COLUMNS].copy()
 
+    chunk["complaint_id"] = chunk["complaint_id"].astype(str).str.replace(r"[^\d]", "", regex=True)
     chunk["complaint_id"] = pd.to_numeric(chunk["complaint_id"], errors="coerce")
     for col in ["date_received", "date_sent_to_company"]:
         chunk[col] = pd.to_datetime(

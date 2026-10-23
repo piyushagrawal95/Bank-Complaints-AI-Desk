@@ -3,6 +3,7 @@ import hashlib
 import logging
 import os
 import smtplib
+from email.utils import formatdate, make_msgid
 import jwt
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -80,9 +81,13 @@ def signup(body: SignupIn):
 
     # Send welcome email asynchronously / gracefully
     try:
-        send_confirmation_email(row["email"], row["full_name"])
+        print(f"\n==========================================")
+        print(f"[MAIL SENDER] Sending confirmation to: {row['email']}")
+        link = send_confirmation_email(row["email"], row["full_name"])
+        print(f"[MAIL SENDER] SUCCESS! Verification link: {link}")
+        print(f"==========================================\n")
     except Exception as exc:
-        logger.warning(f"Email notification skipped: {exc}")
+        print(f"[MAIL ERROR] Failed to send email: {exc}")
 
     return {
         "message": "Account created successfully! You can now sign in with your credentials.",
@@ -303,7 +308,11 @@ def send_confirmation_email(to_email: str, full_name: str | None = None) -> str:
       </body>
     </html>
     """
+    confirm_plain = f"Hello {name_display},\n\nThank you for registering for Bank Complaint AI Desk.\nPlease verify your account by clicking the link below:\n{confirm_link}\n\nThis confirmation link expires in 24 hours.\n"
     msg = MIMEMultipart("alternative")
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=smtp_from.split("@")[-1])
+    msg.attach(MIMEText(confirm_plain, "plain"))
     msg["Subject"] = subject
     msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
     msg["To"] = to_email
@@ -367,7 +376,11 @@ def send_password_reset_email(to_email: str, raw_token: str):
     </html>
     """
 
+    reset_plain = f"Hello,\n\nPlease reset your password by clicking the link below:\n{reset_link}\n\nThis security link is valid for 15 minutes.\n"
     msg = MIMEMultipart("alternative")
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=smtp_from.split("@")[-1])
+    msg.attach(MIMEText(reset_plain, "plain"))
     msg["Subject"] = subject
     msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
     msg["To"] = to_email

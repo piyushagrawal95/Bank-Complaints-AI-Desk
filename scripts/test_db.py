@@ -2,7 +2,8 @@ import os
 import psycopg
 from dotenv import load_dotenv
 
-load_dotenv("backend/.env")
+from pathlib import Path
+load_dotenv(Path(__file__).resolve().parent.parent / "backend" / ".env")
 url = os.getenv("DATABASE_URL")
 
 if not url:

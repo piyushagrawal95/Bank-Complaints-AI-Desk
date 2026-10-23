@@ -15,7 +15,8 @@ def main():
         raise SystemExit("Usage: python scripts/reset_password.py user@example.com")
     email = sys.argv[1].strip().lower()
 
-    load_dotenv("backend/.env")
+    from pathlib import Path
+load_dotenv(Path(__file__).resolve().parent.parent / "backend" / ".env")
     url = os.getenv("DATABASE_URL")
     if not url:
         raise SystemExit("DATABASE_URL is empty in backend/.env")
