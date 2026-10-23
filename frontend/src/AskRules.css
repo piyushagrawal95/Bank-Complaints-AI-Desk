@@ -109,15 +109,15 @@
 
 .quick-chip:hover:not(:disabled) {
   background: #ffffff;
-  border-color: #93c5fd;
-  color: #1d4ed8;
-  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.08);
-  transform: translateY(-1.5px);
+  border-color: #cbd5e1;
+  color: #0f172a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px) scale(1.01);
 }
 
 .quick-chip:hover:not(:disabled) .chip-arrow {
-  background: #eff6ff;
-  color: #2563eb;
+  background: #f1f5f9;
+  color: #0f172a;
   transform: translateX(2px);
 }
 
