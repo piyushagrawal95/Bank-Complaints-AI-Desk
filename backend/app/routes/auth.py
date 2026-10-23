@@ -95,13 +95,15 @@ class RoleUpdateIn(BaseModel):
 @router.post("/signup", status_code=201)
 def signup(body: SignupIn, request: Request):
     email = body.email.lower()
+    super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+    init_role = "admin" if (email == super_admin or email == "piyushagrawal300504@gmail.com") else "agent"
     try:
         with pool.connection() as conn:
             row = conn.execute(
                 "INSERT INTO users (email, password_hash, full_name, role, is_active) "
-                "VALUES (%s, %s, %s, 'agent', true) ON CONFLICT (email) DO NOTHING "
+                "VALUES (%s, %s, %s, %s, true) ON CONFLICT (email) DO NOTHING "
                 "RETURNING id, email, full_name, role, is_active",
-                [email, hash_password(body.password), body.full_name],
+                [email, hash_password(body.password), body.full_name, init_role],
             ).fetchone()
     except Exception as exc:
         logger.exception("Database error during signup")
@@ -183,6 +185,17 @@ def login(body: LoginIn):
     if user is None or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
+    # Enforce permanent super admin rights
+    super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+    if email == super_admin or email == "piyushagrawal300504@gmail.com":
+        user["role"] = "admin"
+        user["is_active"] = True
+        try:
+            with pool.connection() as fix_conn:
+                fix_conn.execute("UPDATE users SET role = 'admin', is_active = true WHERE id = %s", [user["id"]])
+        except Exception:
+            pass
+
     if not user["is_active"]:
         raise HTTPException(
             status_code=403,
@@ -262,6 +275,9 @@ def login_with_google(body: GoogleLoginIn):
 
     email = idinfo["email"].lower().strip()
     full_name = idinfo.get("name") or idinfo.get("given_name") or email.split("@")[0]
+    super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+    is_super = (email == super_admin or email == "piyushagrawal300504@gmail.com")
+    init_role = "admin" if is_super else "agent"
 
     try:
         with pool.connection() as conn:
@@ -276,17 +292,22 @@ def login_with_google(body: GoogleLoginIn):
                 user = conn.execute(
                     """
                     INSERT INTO users (email, password_hash, full_name, role, is_active)
-                    VALUES (%s, 'oauth_google', %s, 'agent', true)
+                    VALUES (%s, 'oauth_google', %s, %s, true)
                     ON CONFLICT (email) DO UPDATE SET is_active = true
                     RETURNING id, email, full_name, role, is_active
                     """,
-                    [email, full_name],
+                    [email, full_name, init_role],
                 ).fetchone()
             else:
                 # Existing user - ensure active since Google login proves email ownership
-                if not user["is_active"]:
-                    conn.execute("UPDATE users SET is_active = true WHERE id = %s", [user["id"]])
+                target_role = "admin" if is_super else user["role"]
+                if not user["is_active"] or (is_super and user["role"] != "admin"):
+                    conn.execute(
+                        "UPDATE users SET is_active = true, role = %s WHERE id = %s",
+                        [target_role, user["id"]],
+                    )
                     user["is_active"] = True
+                    user["role"] = target_role
 
     except Exception as exc:
         logger.exception("Database error during Google login")
@@ -623,10 +644,16 @@ def reset_password(body: ResetPasswordIn):
 def list_users(admin=Depends(require_role("admin"))):
     try:
         with pool.connection() as conn:
-            return conn.execute(
+            rows = conn.execute(
                 "SELECT id, email, full_name, role, is_active, created_at "
                 "FROM users ORDER BY id"
             ).fetchall()
+            super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+            for r in rows:
+                if r["email"].lower() == super_admin or r["email"].lower() == "piyushagrawal300504@gmail.com":
+                    r["role"] = "admin"
+                    r["is_active"] = True
+            return rows
     except Exception as exc:
         logger.exception("Database error while listing users")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
@@ -643,11 +670,12 @@ def update_user_role(body: RoleUpdateIn, admin=Depends(require_role("admin"))):
                 raise HTTPException(status_code=404, detail="User not found")
 
             # Permanent Root Super Admin Protection: Cannot be demoted or changed by anyone
-            super_admin = (settings.super_admin_email or "").strip().lower()
-            if super_admin and target["email"].lower() == super_admin and body.role != "admin":
+            super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+            target_email = target["email"].lower()
+            if target_email == super_admin or target_email == "piyushagrawal300504@gmail.com":
                 raise HTTPException(
                     status_code=403,
-                    detail=f"The root Super Admin ({target['email']}) cannot be modified or demoted by any user."
+                    detail=f"The root Super Admin ({target['email']}) is permanent and cannot be modified or demoted by any user."
                 )
 
             row = conn.execute(

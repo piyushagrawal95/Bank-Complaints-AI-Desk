@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { getUsers, updateUserRole } from "./api";
 import "./UserManagement.css";
 
-const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || "").toLowerCase();
+const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || "piyushagrawal300504@gmail.com").toLowerCase();
+
+function isSuperAdminUser(email) {
+  const em = (email || "").toLowerCase().trim();
+  return em === "piyushagrawal300504@gmail.com" || (SUPER_ADMIN_EMAIL && em === SUPER_ADMIN_EMAIL);
+}
 
 function UserManagement({ currentUser }) {
   const [users, setUsers] = useState([]);
@@ -20,7 +25,13 @@ function UserManagement({ currentUser }) {
     setError(null);
     try {
       const data = await getUsers();
-      setUsers(data);
+      const normalized = (data || []).map((u) => {
+        if (isSuperAdminUser(u.email)) {
+          return { ...u, role: "admin", is_active: true };
+        }
+        return u;
+      });
+      setUsers(normalized);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -111,7 +122,7 @@ function UserManagement({ currentUser }) {
                     <td>
                       <span className="user-name-cell">{u.full_name || "User"}</span>
                       {isCurrent && <span className="you-pill">You</span>}
-                      {SUPER_ADMIN_EMAIL && u.email.toLowerCase() === SUPER_ADMIN_EMAIL && (
+                      {isSuperAdminUser(u.email) && (
                         <span className="root-admin-pill" title="System Founder & Permanent Root Administrator">
                           👑 Owner
                         </span>
@@ -127,7 +138,7 @@ function UserManagement({ currentUser }) {
                       <span className="status-pill active-pill">Active</span>
                     </td>
                     <td>
-                      {SUPER_ADMIN_EMAIL && u.email.toLowerCase() === SUPER_ADMIN_EMAIL ? (
+                      {isSuperAdminUser(u.email) ? (
                         <span className="super-admin-lock-tag" title="Root Super Admin (Role is permanently locked)">
                           🔒 Permanent Admin
                         </span>

@@ -23,7 +23,13 @@ import {
 } from "./Icons";
 
 const EMPTY = { q: "", product: "", state: "", date_from: "", date_to: "" };
-const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || "").toLowerCase();
+const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || "piyushagrawal300504@gmail.com").toLowerCase();
+
+function isSuperAdminUser(email) {
+  const em = (email || "").toLowerCase().trim();
+  return em === "piyushagrawal300504@gmail.com" || (SUPER_ADMIN_EMAIL && em === SUPER_ADMIN_EMAIL);
+}
+
 const PAGE_SIZE = 25;
 const TREND_ROLES = ["supervisor", "admin"];
 const ADMIN_ROLES = ["admin"];
@@ -435,8 +441,10 @@ function App() {
     return <Login onLoggedIn={setUser} />;
   }
 
-  const canSeeTrends = TREND_ROLES.includes(user.role);
-  const canManageUsers = ADMIN_ROLES.includes(user.role);
+  const isSuper = isSuperAdminUser(user.email);
+  const effectiveRole = isSuper ? "admin" : (user.role || "agent");
+  const canSeeTrends = isSuper || TREND_ROLES.includes(effectiveRole);
+  const canManageUsers = isSuper || ADMIN_ROLES.includes(effectiveRole);
   const showTrends = canSeeTrends && view === "trends";
 
   return (
@@ -468,10 +476,8 @@ function App() {
               </span>
               <div className="user-details">
                 <span className="user-name">{user.full_name || user.email}</span>
-                <span className={`badge badge-${user.role}`}>
-                  {SUPER_ADMIN_EMAIL && user.email.toLowerCase() === SUPER_ADMIN_EMAIL
-                    ? "👑 Super Admin"
-                    : user.role}
+                <span className={`badge badge-${effectiveRole}`}>
+                  {isSuper ? "👑 Super Admin" : effectiveRole}
                 </span>
               </div>
               <span className="dropdown-caret">▾</span>
@@ -619,10 +625,10 @@ function App() {
               <div className="profile-row">
                 <span className="profile-lbl">System Role:</span>
                 <span className="profile-val">
-                  <span className={`badge badge-${user.role}`}>
-                    {SUPER_ADMIN_EMAIL && user.email.toLowerCase() === SUPER_ADMIN_EMAIL
+                  <span className={`badge badge-${effectiveRole}`}>
+                    {isSuper
                       ? "👑 Permanent Super Admin"
-                      : user.role.toUpperCase()}
+                      : effectiveRole.toUpperCase()}
                   </span>
                 </span>
               </div>
