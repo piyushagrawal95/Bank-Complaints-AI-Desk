@@ -445,7 +445,7 @@ function Login({ onLoggedIn }) {
                   className="auth-input"
                   type="text"
                   required
-                  placeholder="e.g. Alex Morgan"
+                  placeholder="e.g. Piyush Agrawal"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   autoComplete="off"
@@ -535,7 +535,7 @@ function Login({ onLoggedIn }) {
                   </button>
                 </div>
 
-                {(mode === "signup" || mode === "reset") && (
+                {(mode === "signup" || mode === "reset") && password.length > 0 && (
                   <div className="password-rules-box">
                     <div className="password-rules-header">Password Requirements:</div>
                     <div className="password-rules-list">
