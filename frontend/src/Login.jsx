@@ -148,11 +148,43 @@ function Login({ onLoggedIn }) {
       if (mode === "signup") {
         setLoadingMessage("Creating your bank desk account...");
         const res = await signup(email, password, fullName);
+
+        if (!res.email_sent && res.dev_verification_link) {
+          try {
+            const htmlContent = `
+              <div style="font-family: Arial, sans-serif; color: #1e293b; background: #f8fafc; padding: 20px;">
+                <div style="max-width: 520px; margin: 0 auto; background: white; padding: 24px; border-radius: 10px; border: 1px solid #e2e8f0;">
+                  <h2 style="color: #0284c7; margin-top: 0;">🏛️ Bank Complaint AI Desk</h2>
+                  <p>Hello <strong>${fullName || "Bank Associate"}</strong>,</p>
+                  <p>Thank you for registering. Please click the button below to verify your email address and activate your banking desk account:</p>
+                  <p style="text-align: center; margin: 28px 0;">
+                    <a href="${res.dev_verification_link}" style="background-color: #0284c7; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                      Confirm Email Address
+                    </a>
+                  </p>
+                  <p style="color: #64748b; font-size: 13px;">This confirmation link will expire in 24 hours.</p>
+                </div>
+              </div>`;
+            await fetch("/api/send-email", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to_email: email,
+                subject: "Confirm Your Account - Bank Complaint AI Desk",
+                html: htmlContent,
+                text: `Please verify your account: ${res.dev_verification_link}`,
+              }),
+            });
+          } catch (e) {
+            console.warn("Client fallback email dispatch:", e);
+          }
+        }
+
         setMode("login");
         setPassword("");
         setFullName("");
         setEmail("");
-        setSuccess(res.message || "Account created successfully! You can now sign in.");
+        setSuccess(res.message || "Account created successfully! A confirmation email has been sent to your inbox.");
       } else if (mode === "login") {
         setLoadingMessage("Signing in... Verifying credentials...");
         const result = await login(email, password);

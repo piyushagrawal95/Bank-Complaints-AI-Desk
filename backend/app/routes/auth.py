@@ -285,8 +285,42 @@ def me(user=Depends(get_current_user)):
     return user
 
 
-def dispatch_email_transport(to_email: str, subject: str, html_content: str, text_content: str) -> bool:
-    """Dispatches email via HTTPS API (Resend / Brevo) or falls back to SMTP."""
+def dispatch_email_transport(to_email: str, subject: str, html_content: str, text_content: str, client_origin: str | None = None) -> bool:
+    """Dispatches email via Vercel HTTPS Serverless Relay, HTTPS API (Resend / Brevo) or falls back to SMTP."""
+    # 1. Vercel Serverless Function Relay (HTTPS Port 443 -> Vercel Node.js -> Gmail Port 465)
+    # Bypasses Render outbound SMTP port blocking and sends to ANY recipient email worldwide via Gmail.
+    relay_urls = []
+    if client_origin and client_origin.startswith("http") and "localhost" not in client_origin and "127.0.0.1" not in client_origin:
+        relay_urls.append(f"{client_origin.rstrip('/')}/api/send-email")
+
+    vercel_url = os.getenv("VERCEL_URL", "").strip()
+    if vercel_url:
+        if not vercel_url.startswith("http"):
+            vercel_url = f"https://{vercel_url}"
+        cand = f"{vercel_url.rstrip('/')}/api/send-email"
+        if cand not in relay_urls:
+            relay_urls.append(cand)
+
+    for relay_url in relay_urls:
+        try:
+            payload = json.dumps({
+                "to_email": to_email,
+                "subject": subject,
+                "html": html_content,
+                "text": text_content,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                relay_url,
+                data=payload,
+                headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                if resp.status in (200, 201):
+                    logger.info(f"Email successfully dispatched via Vercel Serverless Relay ({relay_url}) to {to_email}")
+                    return True
+        except Exception as exc:
+            logger.warning(f"Vercel serverless relay ({relay_url}) failed: {exc}")
     # 1. Resend API (HTTPS Port 443 - Recommended for Render & Vercel)
     resend_key = os.getenv("RESEND_API_KEY", "").strip()
     if resend_key:
@@ -355,16 +389,27 @@ def dispatch_email_transport(to_email: str, subject: str, html_content: str, tex
     msg.attach(MIMEText(text_content, "plain"))
     msg.attach(MIMEText(html_content, "html"))
 
+    # Try SSL 465 first
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=5) as server:
+        with smtplib.SMTP_SSL(smtp_host, 465, timeout=6) as server:
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_from, to_email, msg.as_string())
+        logger.info(f"Email sent to {to_email} via SMTP_SSL ({smtp_host}:465)")
+        return True
+    except Exception as ssl_exc:
+        logger.warning(f"SMTP_SSL 465 failed: {ssl_exc}. Attempting STARTTLS 587...")
+
+    # Try STARTTLS 587 fallback
+    try:
+        with smtplib.SMTP(smtp_host, 587, timeout=6) as server:
             server.starttls()
             server.login(smtp_user, smtp_password)
             server.sendmail(smtp_from, to_email, msg.as_string())
-        logger.info(f"Email sent to {to_email} via SMTP ({smtp_host}:{smtp_port})")
+        logger.info(f"Email sent to {to_email} via SMTP STARTTLS ({smtp_host}:587)")
         return True
     except Exception as exc:
         logger.warning(
-            f"SMTP dispatch to {to_email} failed: {exc}. Note: Cloud platforms like Render block outbound SMTP ports (587/465). Use RESEND_API_KEY in Render environment."
+            f"SMTP dispatch to {to_email} failed: {exc}. Note: Cloud platforms like Render block outbound SMTP ports (587/465)."
         )
         return False
 
@@ -404,7 +449,7 @@ def send_confirmation_email(to_email: str, full_name: str | None = None, client_
     """
     confirm_plain = f"Hello {name_display},\n\nThank you for registering for Bank Complaint AI Desk.\nPlease verify your account by clicking the link below:\n{confirm_link}\n\nThis confirmation link expires in 24 hours.\n"
     
-    sent = dispatch_email_transport(to_email, subject, html_content, confirm_plain)
+    sent = dispatch_email_transport(to_email, subject, html_content, confirm_plain, client_origin=client_origin)
     return sent, confirm_link
 
 
@@ -433,7 +478,7 @@ def send_password_reset_email(to_email: str, raw_token: str, client_origin: str 
     """
     reset_plain = f"Hello,\n\nPlease reset your Bank Complaint AI Desk password by clicking the link below:\n{reset_link}\n\nThis security link is valid for 15 minutes.\n"
 
-    return dispatch_email_transport(to_email, subject, html_content, reset_plain)
+    return dispatch_email_transport(to_email, subject, html_content, reset_plain, client_origin=client_origin)
 
 @router.post("/forgot-password")
 def forgot_password(body: ForgotPasswordIn, request: Request):
