@@ -496,11 +496,14 @@ body {
 }
 
 .tab:hover {
-  color: #0f172a;
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-radius: 6px 6px 0 0;
 }
 
 .tab.active {
-  color: #1e40af;
+  background: transparent !important;
+  color: #1e40af !important;
   border-bottom-color: #1e40af;
   font-weight: 600;
 }
