@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { forgotPassword, login, loginWithGoogle, resetPassword, saveToken, signup, verifyEmail } from "./api";
 import { IconShield } from "./Icons";
 import "./Login.css";
@@ -41,82 +41,6 @@ function Login({ onLoggedIn }) {
   const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const turnstileRef = useRef(null);
-  const widgetIdRef = useRef(null);
-
-  function resetTurnstile() {
-    setTurnstileToken("");
-    if (widgetIdRef.current !== null && window.turnstile) {
-      try {
-        window.turnstile.reset(widgetIdRef.current);
-      } catch (e) {
-        // ignore
-      }
-    }
-  }
-
-  useEffect(() => {
-    if (mode !== "login" && mode !== "signup") return;
-
-    const siteKey =
-      import.meta.env.VITE_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
-
-    let retryTimer = null;
-    let attempts = 0;
-
-    function renderTurnstile() {
-      if (!turnstileRef.current) return;
-
-      if (window.turnstile) {
-        try {
-          if (widgetIdRef.current !== null) {
-            try {
-              window.turnstile.remove(widgetIdRef.current);
-            } catch (e) {
-              // ignore
-            }
-            widgetIdRef.current = null;
-          }
-
-          widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
-            sitekey: siteKey,
-            theme: "light",
-            callback: (token) => {
-              setTurnstileToken(token);
-              setError(null);
-            },
-            "expired-callback": () => {
-              setTurnstileToken("");
-            },
-            "error-callback": () => {
-              console.warn("Turnstile challenge issue.");
-            },
-          });
-        } catch (e) {
-          console.error("Turnstile render error:", e);
-        }
-      } else if (attempts < 50) {
-        attempts++;
-        retryTimer = setTimeout(renderTurnstile, 100);
-      }
-    }
-
-    setTurnstileToken("");
-    renderTurnstile();
-
-    return () => {
-      if (retryTimer) clearTimeout(retryTimer);
-      if (widgetIdRef.current !== null && window.turnstile) {
-        try {
-          window.turnstile.remove(widgetIdRef.current);
-        } catch (e) {
-          // ignore
-        }
-        widgetIdRef.current = null;
-      }
-    };
-  }, [mode]);
 
   const passwordChecks = {
     minLength: password.length >= 8,
@@ -285,17 +209,12 @@ function Login({ onLoggedIn }) {
       }
     }
 
-    if ((mode === "login" || mode === "signup") && !turnstileToken) {
-      setError("Please complete the Cloudflare security verification.");
-      return;
-    }
-
     setLoading(true);
 
     try {
       if (mode === "signup") {
         setLoadingMessage("Creating your bank desk account...");
-        const res = await signup(email, password, fullName, turnstileToken);
+        const res = await signup(email, password, fullName);
 
         if (!res.email_sent && res.dev_verification_link) {
           try {
@@ -335,7 +254,7 @@ function Login({ onLoggedIn }) {
         setSuccess(res.message || "Account created successfully! A confirmation email has been sent to your inbox.");
       } else if (mode === "login") {
         setLoadingMessage("Signing in... Verifying credentials...");
-        const result = await login(email, password, turnstileToken);
+        const result = await login(email, password);
         saveToken(result.access_token);
         onLoggedIn(result.user);
       } else if (mode === "forgot") {
@@ -354,7 +273,6 @@ function Login({ onLoggedIn }) {
         setSuccess(res.message || "Password updated successfully! You can now sign in with your new password.");
       }
     } catch (err) {
-      resetTurnstile();
       setError(err.message);
     } finally {
       setLoading(false);
@@ -665,12 +583,6 @@ function Login({ onLoggedIn }) {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-
-            {(mode === "login" || mode === "signup") && (
-              <div className="turnstile-container">
-                <div ref={turnstileRef} className="turnstile-slot"></div>
               </div>
             )}
 

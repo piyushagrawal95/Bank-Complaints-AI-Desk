@@ -53,45 +53,8 @@ def test_signup_password_complexity(client):
     assert "special character" in r4.json()["detail"].lower()
 
 
-def test_captcha_challenge_and_verification(client):
-    # 1. Fetch challenge
-    res = client.get("/auth/captcha")
-    assert res.status_code == 200
-    data = res.json()
-    assert "question" in data
-    assert "captcha_token" in data
-
-    # 2. Reject missing captcha/turnstile on login
-    r_missing = client.post("/auth/login", json={"email": "nobody@bank.com", "password": "Password123@"})
-    assert r_missing.status_code == 400
-    assert "Security verification" in r_missing.json()["detail"]
-
-    # 3. Reject invalid captcha answer
-    r_invalid = client.post("/auth/login", json={
-        "email": "nobody@bank.com",
-        "password": "Password123@",
-        "captcha_token": data["captcha_token"],
-        "captcha_answer": "wrong_ans_999",
-    })
-    assert r_invalid.status_code == 400
-    assert "Incorrect CAPTCHA answer" in r_invalid.json()["detail"]
-
-    # 4. Turnstile token verification
-    r_turnstile = client.post("/auth/login", json={
-        "email": "nonexistent@bank.com",
-        "password": "WrongPassword123",
-        "turnstile_token": "TEST_CAPTCHA_BYPASS",
-    })
-    assert r_turnstile.status_code == 401
-
-
 def test_login_invalid_credentials(client):
-    res = client.post("/auth/login", json={
-        "email": "nonexistent@bank.com",
-        "password": "WrongPassword123",
-        "captcha_token": "TEST_CAPTCHA_BYPASS",
-        "captcha_answer": "bypass",
-    })
+    res = client.post("/auth/login", json={"email": "nonexistent@bank.com", "password": "WrongPassword123"})
     assert res.status_code == 401
 
 
