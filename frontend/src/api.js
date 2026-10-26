@@ -90,13 +90,29 @@ async function request(path, { method = "GET", params = {}, body } = {}) {
 }
 
 // Auth endpoints
-export const login = (email, password) =>
-  request("/auth/login", { method: "POST", body: { email, password } });
+export const login = (email, password, turnstile_token = null, captcha_token = null, captcha_answer = null) =>
+  request("/auth/login", {
+    method: "POST",
+    body: {
+      email,
+      password,
+      turnstile_token: turnstile_token || null,
+      captcha_token: captcha_token || null,
+      captcha_answer: captcha_answer || null,
+    },
+  });
 
-export const signup = (email, password, fullName) =>
+export const signup = (email, password, fullName, turnstile_token = null, captcha_token = null, captcha_answer = null) =>
   request("/auth/signup", {
     method: "POST",
-    body: { email, password, full_name: fullName || null },
+    body: {
+      email,
+      password,
+      full_name: fullName || null,
+      turnstile_token: turnstile_token || null,
+      captcha_token: captcha_token || null,
+      captcha_answer: captcha_answer || null,
+    },
   });
 
 export const forgotPassword = (email) =>

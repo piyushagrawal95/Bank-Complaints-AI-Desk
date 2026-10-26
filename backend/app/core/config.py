@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     maileroo_api_key: str = os.getenv("MAILEROO_API_KEY", "")
     maileroo_from: str = os.getenv("MAILEROO_FROM", "")
     vercel_url: str = os.getenv("VERCEL_URL", "")
+    turnstile_secret_key: str = os.getenv("TURNSTILE_SECRET_KEY", "")
+
 
     model_config = SettingsConfigDict(extra="ignore")
 

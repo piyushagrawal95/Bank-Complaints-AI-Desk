@@ -681,3 +681,20 @@ input[type="password"]::-ms-clear {
   border: 1px solid #bbf7d0;
 }
 
+
+/* Cloudflare Turnstile Verification Widget */
+.turnstile-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 1.15rem 0 0.95rem 0;
+  width: 100%;
+  min-height: 65px;
+}
+
+.turnstile-slot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}

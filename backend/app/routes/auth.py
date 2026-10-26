@@ -23,8 +23,12 @@ from app.db import pool
 from app.deps import get_current_user, require_role
 from app.security import (
     create_access_token,
+    generate_captcha_challenge,
     generate_reset_token,
     hash_password,
+    verify_captcha_challenge,
+    verify_security_challenge,
+    verify_turnstile_token,
     verify_password,
 )
 
@@ -57,6 +61,9 @@ class SignupIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = Field(default=None, max_length=100)
+    turnstile_token: str | None = None
+    captcha_token: str | None = None
+    captcha_answer: str | None = None
 
     @field_validator("password")
     @classmethod
@@ -67,6 +74,9 @@ class SignupIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str = Field(max_length=128)
+    turnstile_token: str | None = None
+    captcha_token: str | None = None
+    captcha_answer: str | None = None
 
 
 class ForgotPasswordIn(BaseModel):
@@ -97,8 +107,25 @@ class RoleUpgradeRequestIn(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
+@router.get("/captcha")
+def get_captcha():
+    """Generates a math CAPTCHA challenge with an HMAC-SHA256 signed token."""
+    return generate_captcha_challenge()
+
+
 @router.post("/signup", status_code=201)
 def signup(body: SignupIn, request: Request):
+    # Verify Security (Cloudflare Turnstile with CAPTCHA fallback)
+    client_ip = request.client.host if request.client else None
+    is_valid, err_msg = verify_security_challenge(
+        turnstile_token=body.turnstile_token,
+        captcha_token=body.captcha_token,
+        captcha_answer=body.captcha_answer,
+        client_ip=client_ip,
+    )
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=err_msg)
+
     email = body.email.lower()
     super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
     init_role = "admin" if (email == super_admin or email == "piyushagrawal300504@gmail.com") else "agent"
@@ -174,7 +201,18 @@ def verify_email(body:VerifyEmailIn):
     return {"message": "Email successfully verified! Your account is now active. Please sign in."}
 
 @router.post("/login")
-def login(body: LoginIn):
+def login(body: LoginIn, request: Request):
+    # Verify Security (Cloudflare Turnstile with CAPTCHA fallback)
+    client_ip = request.client.host if request.client else None
+    is_valid, err_msg = verify_security_challenge(
+        turnstile_token=body.turnstile_token,
+        captcha_token=body.captcha_token,
+        captcha_answer=body.captcha_answer,
+        client_ip=client_ip,
+    )
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=err_msg)
+
     email = body.email.lower()
     try:
         with pool.connection() as conn:
