@@ -92,6 +92,11 @@ class RoleUpdateIn(BaseModel):
     role: str = Field(pattern="^(agent|supervisor|admin)$")
 
 
+class RoleUpgradeRequestIn(BaseModel):
+    requested_role: str = Field(pattern="^(supervisor|admin)$")
+    reason: str | None = Field(default=None, max_length=500)
+
+
 @router.post("/signup", status_code=201)
 def signup(body: SignupIn, request: Request):
     email = body.email.lower()
@@ -688,3 +693,189 @@ def update_user_role(body: RoleUpdateIn, admin=Depends(require_role("admin"))):
     except Exception as exc:
         logger.exception("Database error while updating role")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
+
+
+@router.post("/role-upgrade/request")
+def request_role_upgrade(body: RoleUpgradeRequestIn, user=Depends(get_current_user)):
+    """Allows an Agent or Supervisor to request a formal promotion to Supervisor or Admin."""
+    user_id = user["id"]
+    current_role = (user.get("role") or "agent").lower()
+    target_role = body.requested_role.lower()
+
+    if current_role == "admin":
+        raise HTTPException(status_code=400, detail="You already hold the highest administrative role (Admin).")
+
+    if current_role == "supervisor" and target_role != "admin":
+        raise HTTPException(status_code=400, detail="As a Supervisor, you can only request promotion to Admin.")
+
+    if current_role == target_role:
+        raise HTTPException(status_code=400, detail=f"You are already assigned as {current_role.capitalize()}.")
+
+    try:
+        with pool.connection() as conn:
+            existing = conn.execute(
+                "SELECT id, to_role, status FROM role_upgrade_requests WHERE user_id = %s AND status = 'pending'",
+                [user_id]
+            ).fetchone()
+
+            if existing:
+                conn.execute(
+                    "UPDATE role_upgrade_requests SET from_role = %s, to_role = %s, reason = %s, created_at = now() WHERE id = %s",
+                    [current_role, target_role, body.reason, existing["id"]]
+                )
+                req_id = existing["id"]
+            else:
+                row = conn.execute(
+                    "INSERT INTO role_upgrade_requests (user_id, from_role, to_role, reason, status) "
+                    "VALUES (%s, %s, %s, %s, 'pending') RETURNING id",
+                    [user_id, current_role, target_role, body.reason]
+                ).fetchone()
+                req_id = row["id"]
+    except Exception:
+        logger.exception("Database error while creating role upgrade request")
+        raise HTTPException(status_code=503, detail="Database error. Please try again.")
+
+    # Send non-blocking notification to Super Admin
+    try:
+        user_name = user.get("full_name") or user.get("email")
+        super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+        subject = f"Role Upgrade Request: {user_name} requests {target_role.upper()}"
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>🏛️ Bank Complaint AI Desk — Role Upgrade Request</h2>
+            <p>User <strong>{user_name}</strong> ({user.get('email')}) has requested promotion:</p>
+            <ul>
+                <li><strong>Current Role:</strong> {current_role.upper()}</li>
+                <li><strong>Requested Role:</strong> {target_role.upper()}</li>
+                <li><strong>Reason:</strong> {body.reason or 'No reason provided'}</li>
+            </ul>
+            <p>Please log in to the User Management Portal to review and approve or reject this request.</p>
+        </div>
+        """
+        plain_content = f"User {user_name} ({user.get('email')}) requested promotion from {current_role} to {target_role}.\nReason: {body.reason}\nPlease log in to review."
+        dispatch_email_transport(super_admin, subject, html_content, plain_content)
+    except Exception as email_err:
+        logger.warning(f"Could not dispatch email notification for role upgrade: {email_err}")
+
+    return {
+        "message": f"Role upgrade request for {target_role.upper()} submitted successfully! It is now pending Admin approval.",
+        "request_id": req_id,
+        "to_role": target_role,
+        "status": "pending"
+    }
+
+
+@router.get("/role-upgrade/my-status")
+def get_my_role_upgrade_status(user=Depends(get_current_user)):
+    """Retrieves current pending upgrade request for the logged-in user."""
+    user_id = user["id"]
+    try:
+        with pool.connection() as conn:
+            row = conn.execute(
+                "SELECT id, from_role, to_role, reason, status, created_at "
+                "FROM role_upgrade_requests WHERE user_id = %s ORDER BY id DESC LIMIT 1",
+                [user_id]
+            ).fetchone()
+            if not row or row["status"] != "pending":
+                return {"has_pending": False, "request": None}
+            return {
+                "has_pending": True,
+                "request": {
+                    "id": row["id"],
+                    "from_role": row["from_role"],
+                    "to_role": row["to_role"],
+                    "reason": row["reason"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None
+                }
+            }
+    except Exception:
+        logger.exception("Database error while checking role upgrade status")
+        return {"has_pending": False, "request": None}
+
+
+@router.get("/role-upgrade/pending")
+def list_pending_role_upgrades(admin=Depends(require_role("admin"))):
+    """Admin endpoint to view all pending promotion requests across the bank desk."""
+    try:
+        with pool.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT r.id, r.user_id, r.from_role, r.to_role, r.reason, r.status, r.created_at,
+                       u.email, u.full_name
+                FROM role_upgrade_requests r
+                JOIN users u ON u.id = r.user_id
+                WHERE r.status = 'pending'
+                ORDER BY r.created_at ASC
+                """
+            ).fetchall()
+            return rows
+    except Exception:
+        logger.exception("Database error while listing pending role upgrades")
+        raise HTTPException(status_code=503, detail="Database error while listing pending requests.")
+
+
+@router.post("/role-upgrade/{request_id}/approve")
+def approve_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
+    """Admin endpoint to formally approve a role upgrade request and update user permissions."""
+    admin_id = admin["id"]
+    try:
+        with pool.connection() as conn:
+            req = conn.execute(
+                "SELECT id, user_id, to_role, status FROM role_upgrade_requests WHERE id = %s",
+                [request_id]
+            ).fetchone()
+            if not req:
+                raise HTTPException(status_code=404, detail="Role upgrade request not found.")
+            if req["status"] != "pending":
+                raise HTTPException(status_code=400, detail=f"Request has already been {req['status']}.")
+
+            target_user_id = req["user_id"]
+            new_role = req["to_role"]
+
+            # Update the user's role in the database
+            conn.execute("UPDATE users SET role = %s WHERE id = %s", [new_role, target_user_id])
+            # Mark request as approved
+            conn.execute(
+                "UPDATE role_upgrade_requests SET status = 'approved', reviewed_at = now(), reviewed_by_id = %s WHERE id = %s",
+                [admin_id, request_id]
+            )
+            user_info = conn.execute(
+                "SELECT id, email, full_name, role FROM users WHERE id = %s",
+                [target_user_id]
+            ).fetchone()
+            return {
+                "message": f"Successfully approved! User is now promoted to {new_role.upper()}.",
+                "user": user_info
+            }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Database error while approving role upgrade")
+        raise HTTPException(status_code=503, detail="Database error while approving request.")
+
+
+@router.post("/role-upgrade/{request_id}/reject")
+def reject_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
+    """Admin endpoint to formally decline a role upgrade request."""
+    admin_id = admin["id"]
+    try:
+        with pool.connection() as conn:
+            req = conn.execute(
+                "SELECT id, user_id, to_role, status FROM role_upgrade_requests WHERE id = %s",
+                [request_id]
+            ).fetchone()
+            if not req:
+                raise HTTPException(status_code=404, detail="Role upgrade request not found.")
+            if req["status"] != "pending":
+                raise HTTPException(status_code=400, detail=f"Request has already been {req['status']}.")
+
+            conn.execute(
+                "UPDATE role_upgrade_requests SET status = 'rejected', reviewed_at = now(), reviewed_by_id = %s WHERE id = %s",
+                [admin_id, request_id]
+            )
+            return {"message": "Role upgrade request has been rejected."}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Database error while rejecting role upgrade")
+        raise HTTPException(status_code=503, detail="Database error while rejecting request.")

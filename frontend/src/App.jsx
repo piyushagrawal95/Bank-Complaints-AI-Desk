@@ -3,8 +3,10 @@ import {
   clearToken,
   getComplaints,
   getMe,
+  getMyRoleUpgradeStatus,
   getProducts,
   getToken,
+  requestRoleUpgrade,
   setUnauthorizedHandler,
 } from "./api";
 import AskRules from "./AskRules";
@@ -356,8 +358,52 @@ function App() {
   const [checking, setChecking] = useState(Boolean(getToken()));
   const [profileOpen, setProfileOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [upgradeStatus, setUpgradeStatus] = useState(null);
+  const [showUpgradeForm, setShowUpgradeForm] = useState(false);
+  const [targetRole, setTargetRole] = useState("supervisor");
+  const [upgradeReason, setUpgradeReason] = useState("");
+  const [submittingUpgrade, setSubmittingUpgrade] = useState(false);
+  const [upgradeMessage, setUpgradeMessage] = useState(null);
+  const [upgradeError, setUpgradeError] = useState(null);
   const profileTimeoutRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (showProfileModal && user) {
+      const isSuper = isSuperAdminUser(user.email);
+      const role = isSuper ? "admin" : (user.role || "agent");
+      if (!isSuper && role !== "admin") {
+        getMyRoleUpgradeStatus()
+          .then((res) => {
+            setUpgradeStatus(res);
+          })
+          .catch(() => {});
+      }
+    }
+  }, [showProfileModal, user]);
+
+  const handleUpgradeSubmit = async (e) => {
+    e.preventDefault();
+    setSubmittingUpgrade(true);
+    setUpgradeError(null);
+    setUpgradeMessage(null);
+    try {
+      const res = await requestRoleUpgrade(targetRole, upgradeReason);
+      setUpgradeMessage(res.message);
+      setUpgradeStatus({
+        has_pending: true,
+        request: {
+          to_role: targetRole,
+          reason: upgradeReason,
+        },
+      });
+      setShowUpgradeForm(false);
+    } catch (err) {
+      setUpgradeError(err.message || "Failed to submit role upgrade request.");
+    } finally {
+      setSubmittingUpgrade(false);
+    }
+  };
 
   const handleProfileEnter = () => {
     if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
@@ -640,7 +686,98 @@ function App() {
               </div>
             </div>
 
-            <div style={{ textAlign: "right" }}>
+            {/* Role Elevation Section (For Non-Admins) */}
+            {!isSuper && effectiveRole !== "admin" && (
+              <div className="role-upgrade-section">
+                {upgradeMessage && (
+                  <div className="upgrade-alert-success">{upgradeMessage}</div>
+                )}
+
+                {upgradeStatus?.has_pending ? (
+                  <div className="upgrade-pending-card">
+                    <div className="upgrade-pending-title">
+                      <span>⏳</span>
+                      <strong>Promotion Request Pending Admin Review</strong>
+                    </div>
+                    <div className="upgrade-pending-details">
+                      <div>Requested Role: <strong>{upgradeStatus.request.to_role.toUpperCase()}</strong></div>
+                      {upgradeStatus.request.reason && (
+                        <div style={{ marginTop: "4px" }}>Reason: <em>"{upgradeStatus.request.reason}"</em></div>
+                      )}
+                    </div>
+                    <p className="upgrade-pending-note">
+                      Your permissions remain as <strong>{effectiveRole.toUpperCase()}</strong> until the Administrator approves your request.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {!showUpgradeForm ? (
+                      <div style={{ marginTop: "1rem" }}>
+                        <button
+                          type="button"
+                          className="secondary upgrade-trigger-btn"
+                          onClick={() => {
+                            setShowUpgradeForm(true);
+                            setTargetRole(effectiveRole === "supervisor" ? "admin" : "supervisor");
+                            setUpgradeError(null);
+                            setUpgradeMessage(null);
+                          }}
+                        >
+                          <span>📢</span> Request Role Upgrade to {effectiveRole === "supervisor" ? "Admin" : "Supervisor / Admin"}
+                        </button>
+                      </div>
+                    ) : (
+                      <form className="upgrade-form-box" onSubmit={handleUpgradeSubmit}>
+                        <h4 className="upgrade-form-title">Request Role Elevation</h4>
+                        <div className="upgrade-form-field">
+                          <label>Desired Role:</label>
+                          <select
+                            className="upgrade-select"
+                            value={targetRole}
+                            onChange={(e) => setTargetRole(e.target.value)}
+                          >
+                            {effectiveRole === "agent" && (
+                              <option value="supervisor">Supervisor</option>
+                            )}
+                            <option value="admin">Administrator (Admin)</option>
+                          </select>
+                        </div>
+                        <div className="upgrade-form-field">
+                          <label>Reason / Department Justification:</label>
+                          <textarea
+                            className="upgrade-textarea"
+                            rows={2}
+                            placeholder="e.g. Transferred to senior escalation desk, need supervisory trends access..."
+                            value={upgradeReason}
+                            onChange={(e) => setUpgradeReason(e.target.value)}
+                          />
+                        </div>
+                        {upgradeError && <div className="upgrade-alert-error">{upgradeError}</div>}
+                        <div className="upgrade-form-actions">
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => setShowUpgradeForm(false)}
+                            disabled={submittingUpgrade}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="primary-btn"
+                            disabled={submittingUpgrade}
+                          >
+                            {submittingUpgrade ? "Submitting..." : "Submit to Admin"}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            <div style={{ textAlign: "right", marginTop: "1.2rem" }}>
               <button
                 type="button"
                 className="primary-btn"

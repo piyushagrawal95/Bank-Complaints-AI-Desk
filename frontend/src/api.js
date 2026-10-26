@@ -75,7 +75,7 @@ async function request(path, { method = "GET", params = {}, body } = {}) {
         message = errorMsgs.filter(Boolean).join(". ") || "Please verify the submitted form values.";
       } else if (typeof data.message === "string" && data.message.trim()) {
         message = data.message;
-      } else if (typeof data.error === "string" && data.error.trim()) {
+      } else if (typeof data.error === "string" && data.error.trim() ) {
         message = data.error;
       }
     } catch {
@@ -132,6 +132,23 @@ export const getSpikes = (params) => request("/trends/spikes", { params });
 export const getUsers = () => request("/auth/users");
 export const updateUserRole = (user_id, role) =>
   request("/auth/users/role", { method: "PUT", body: { user_id, role } });
+
+// Role Upgrade Request & Approval Endpoints
+export const requestRoleUpgrade = (requested_role, reason) =>
+  request("/auth/role-upgrade/request", {
+    method: "POST",
+    body: { requested_role, reason: reason || null },
+  });
+
+export const getMyRoleUpgradeStatus = () => request("/auth/role-upgrade/my-status");
+
+export const getPendingRoleUpgrades = () => request("/auth/role-upgrade/pending");
+
+export const approveRoleUpgrade = (requestId) =>
+  request(`/auth/role-upgrade/${requestId}/approve`, { method: "POST" });
+
+export const rejectRoleUpgrade = (requestId) =>
+  request(`/auth/role-upgrade/${requestId}/reject`, { method: "POST" });
 
 export async function loginWithGoogle(credential) {
   return request("/auth/google", {
