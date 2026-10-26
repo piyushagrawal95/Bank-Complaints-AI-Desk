@@ -366,8 +366,38 @@ function App() {
   const [upgradeMessage, setUpgradeMessage] = useState(null);
   const [upgradeError, setUpgradeError] = useState(null);
   const [livePromotionNotice, setLivePromotionNotice] = useState(null);
+  const [showCelebrationCard, setShowCelebrationCard] = useState(true);
   const profileTimeoutRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  // Auto-dismiss live promotion toast banner after 5 seconds so it disappears smoothly
+  useEffect(() => {
+    if (!livePromotionNotice) return;
+    const timer = setTimeout(() => {
+      setLivePromotionNotice(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [livePromotionNotice]);
+
+  // Auto-dismiss submission success message in profile modal after 4.5 seconds
+  useEffect(() => {
+    if (!upgradeMessage) return;
+    const timer = setTimeout(() => {
+      setUpgradeMessage(null);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [upgradeMessage]);
+
+  // Auto-dismiss celebration card in profile modal after 5.5 seconds
+  useEffect(() => {
+    if (showProfileModal && upgradeStatus?.request?.status === "approved") {
+      setShowCelebrationCard(true);
+      const timer = setTimeout(() => {
+        setShowCelebrationCard(false);
+      }, 5500);
+      return () => clearTimeout(timer);
+    }
+  }, [showProfileModal, upgradeStatus]);
 
   useEffect(() => {
     if (showProfileModal && user) {
@@ -738,11 +768,21 @@ function App() {
                   </div>
                 ) : (
                   <>
-                    {!upgradeStatus?.has_pending && upgradeStatus?.request?.status === "approved" && (
+                    {!upgradeStatus?.has_pending && upgradeStatus?.request?.status === "approved" && showCelebrationCard && (
                       <div className="upgrade-approved-card">
                         <div className="upgrade-approved-title">
-                          <span>🎉</span>
-                          <strong>Promotion Approved by Admin!</strong>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                            <span>🎉</span>
+                            <strong>Promotion Approved by Admin!</strong>
+                          </span>
+                          <button
+                            type="button"
+                            className="card-dismiss-btn"
+                            onClick={() => setShowCelebrationCard(false)}
+                            title="Dismiss notification"
+                          >
+                            ✕
+                          </button>
                         </div>
                         <div className="upgrade-approved-details">
                           Your request for <strong>{upgradeStatus.request.to_role.toUpperCase()}</strong> was approved. Your elevated permissions are active right now!

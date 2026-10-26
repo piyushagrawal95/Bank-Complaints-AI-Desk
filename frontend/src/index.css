@@ -515,11 +515,28 @@ body {
 .upgrade-approved-title {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.4rem;
   color: #166534;
   font-size: 0.88rem;
   font-weight: 700;
   margin-bottom: 0.35rem;
+}
+
+.card-dismiss-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #166534 !important;
+  cursor: pointer !important;
+  font-size: 0.9rem !important;
+  padding: 0 4px !important;
+  line-height: 1 !important;
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+.card-dismiss-btn:hover {
+  opacity: 1;
 }
 
 .upgrade-approved-details {
