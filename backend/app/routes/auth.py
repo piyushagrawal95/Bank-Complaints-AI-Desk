@@ -846,7 +846,7 @@ def approve_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
                 [target_user_id]
             ).fetchone()
 
-            # Dispatch congratulatory email notification to user
+            # Dispatch congratulatory email notification to user asynchronously (never blocks the HTTP response)
             if user_info and user_info.get("email"):
                 target_email = user_info["email"]
                 user_name = user_info.get("full_name") or target_email.split("@")[0]
@@ -868,7 +868,7 @@ def approve_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
                         </p>
                     </div>
                     <p style="color: #475569; font-size: 14px;">
-                        Your elevated permissions are active right now. Next time you refresh or view your desk, you will have full access to your new tools and workflows.
+                        Your elevated permissions are active right now. Next time you view your desk, you will have full access to your new tools and workflows.
                     </p>
                     <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
                     <p style="color: #94a3b8; font-size: 12px; margin: 0;">
@@ -878,9 +878,14 @@ def approve_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
                 """
                 text_content = f"Congratulations {user_name}! Your request to become {new_role.upper()} has been approved by the administrator."
                 try:
-                    dispatch_email_transport(target_email, subject, html_content, text_content)
+                    import threading
+                    threading.Thread(
+                        target=dispatch_email_transport,
+                        args=(target_email, subject, html_content, text_content),
+                        daemon=True
+                    ).start()
                 except Exception as e:
-                    logger.warning(f"Could not dispatch role upgrade approval email: {e}")
+                    logger.warning(f"Could not dispatch async role upgrade approval email: {e}")
 
             return {
                 "message": f"Successfully approved! User is now promoted to {new_role.upper()}.",
@@ -945,9 +950,14 @@ def reject_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
                 """
                 text_content = f"Hello {user_name}, your request to become {to_role.upper()} was reviewed and not approved at this time."
                 try:
-                    dispatch_email_transport(target_email, subject, html_content, text_content)
+                    import threading
+                    threading.Thread(
+                        target=dispatch_email_transport,
+                        args=(target_email, subject, html_content, text_content),
+                        daemon=True
+                    ).start()
                 except Exception as e:
-                    logger.warning(f"Could not dispatch role upgrade rejection email: {e}")
+                    logger.warning(f"Could not dispatch async role upgrade rejection email: {e}")
 
             return {"message": "Role upgrade request has been rejected."}
     except HTTPException:

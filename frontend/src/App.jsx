@@ -492,7 +492,7 @@ function App() {
       .finally(() => setChecking(false));
   }, []);
 
-  // Background sync: polls every 10 seconds to auto-elevate user when admin approves promotion
+  // Background sync: polls every 4 seconds so promotions reflect in true real-time
   useEffect(() => {
     if (!user || isSuperAdminUser(user.email) || user.role === "admin") return;
     const interval = setInterval(() => {
@@ -505,7 +505,7 @@ function App() {
           }
         })
         .catch(() => {});
-    }, 10000);
+    }, 4000);
     return () => clearInterval(interval);
   }, [user]);
 

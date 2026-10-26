@@ -26,6 +26,13 @@ function UserManagement({ currentUser }) {
 
   useEffect(() => {
     loadUsers();
+    // Poll pending upgrade requests every 5 seconds so new submissions appear in real-time
+    const interval = setInterval(() => {
+      getPendingRoleUpgrades()
+        .then((data) => setPendingUpgrades(data || []))
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   async function loadUsers() {
