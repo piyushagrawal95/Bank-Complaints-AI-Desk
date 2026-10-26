@@ -502,6 +502,121 @@ body {
   margin-top: 0.5rem;
 }
 
+.upgrade-approved-card {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-left: 4px solid #16a34a;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.upgrade-approved-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #166534;
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.upgrade-approved-details {
+  font-size: 0.84rem;
+  color: #15803d;
+  line-height: 1.4;
+}
+
+.upgrade-rejected-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #94a3b8;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.upgrade-rejected-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.upgrade-rejected-details {
+  font-size: 0.84rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* LIVE PROMOTION TOAST BANNER */
+.live-promotion-toast {
+  position: sticky;
+  top: 1rem;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #ffffff;
+  padding: 0.85rem 1.25rem;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4), 0 8px 10px -6px rgba(16, 185, 129, 0.2);
+  margin-bottom: 1.25rem;
+  animation: slideDownToast 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownToast {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.live-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.live-toast-icon {
+  font-size: 1.4rem;
+}
+
+.live-toast-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.live-toast-close {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 0.85rem !important;
+  padding: 0 !important;
+  transition: background 0.15s ease !important;
+}
+
+.live-toast-close:hover {
+  background: rgba(255, 255, 255, 0.35) !important;
+}
+
 /* ROLE BADGES */
 .badge {
   display: inline-block;

@@ -767,25 +767,27 @@ def request_role_upgrade(body: RoleUpgradeRequestIn, user=Depends(get_current_us
 
 @router.get("/role-upgrade/my-status")
 def get_my_role_upgrade_status(user=Depends(get_current_user)):
-    """Retrieves current pending upgrade request for the logged-in user."""
+    """Retrieves current pending or recent upgrade request for the logged-in user."""
     user_id = user["id"]
     try:
         with pool.connection() as conn:
             row = conn.execute(
-                "SELECT id, from_role, to_role, reason, status, created_at "
+                "SELECT id, from_role, to_role, reason, status, created_at, reviewed_at "
                 "FROM role_upgrade_requests WHERE user_id = %s ORDER BY id DESC LIMIT 1",
                 [user_id]
             ).fetchone()
-            if not row or row["status"] != "pending":
+            if not row:
                 return {"has_pending": False, "request": None}
             return {
-                "has_pending": True,
+                "has_pending": row["status"] == "pending",
                 "request": {
                     "id": row["id"],
                     "from_role": row["from_role"],
                     "to_role": row["to_role"],
                     "reason": row["reason"],
-                    "created_at": row["created_at"].isoformat() if row["created_at"] else None
+                    "status": row["status"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                    "reviewed_at": row["reviewed_at"].isoformat() if row.get("reviewed_at") else None,
                 }
             }
     except Exception:
@@ -843,6 +845,43 @@ def approve_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
                 "SELECT id, email, full_name, role FROM users WHERE id = %s",
                 [target_user_id]
             ).fetchone()
+
+            # Dispatch congratulatory email notification to user
+            if user_info and user_info.get("email"):
+                target_email = user_info["email"]
+                user_name = user_info.get("full_name") or target_email.split("@")[0]
+                admin_name = admin.get("full_name") or admin.get("email", "Admin")
+                subject = f"🎉 Role Upgrade Approved: Welcome to {new_role.upper()}"
+                html_content = f"""
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <div style="background: #1e3a8a; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
+                        <h2 style="color: #ffffff; margin: 0; font-size: 20px;">Bank Complaint AI Desk</h2>
+                    </div>
+                    <h3 style="color: #0f172a; margin-top: 0;">🎉 Congratulations, {user_name}!</h3>
+                    <p style="color: #334155; font-size: 15px; line-height: 1.5;">
+                        Your request to be promoted to <strong>{new_role.upper()}</strong> has been reviewed and <strong style="color: #16a34a;">APPROVED</strong> by administrator ({admin_name}).
+                    </p>
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 14px; border-radius: 6px; margin: 18px 0;">
+                        <p style="margin: 0; color: #166534; font-size: 14px;">
+                            <strong>New Role:</strong> {new_role.upper()}<br/>
+                            <strong>Status:</strong> Active immediately
+                        </p>
+                    </div>
+                    <p style="color: #475569; font-size: 14px;">
+                        Your elevated permissions are active right now. Next time you refresh or view your desk, you will have full access to your new tools and workflows.
+                    </p>
+                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                    <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                        Automated notification from Bank Complaint AI Desk Compliance & Governance Engine.
+                    </p>
+                </div>
+                """
+                text_content = f"Congratulations {user_name}! Your request to become {new_role.upper()} has been approved by the administrator."
+                try:
+                    dispatch_email_transport(target_email, subject, html_content, text_content)
+                except Exception as e:
+                    logger.warning(f"Could not dispatch role upgrade approval email: {e}")
+
             return {
                 "message": f"Successfully approved! User is now promoted to {new_role.upper()}.",
                 "user": user_info
@@ -869,10 +908,47 @@ def reject_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
             if req["status"] != "pending":
                 raise HTTPException(status_code=400, detail=f"Request has already been {req['status']}.")
 
+            target_user_id = req["user_id"]
+            to_role = req["to_role"]
+
             conn.execute(
                 "UPDATE role_upgrade_requests SET status = 'rejected', reviewed_at = now(), reviewed_by_id = %s WHERE id = %s",
                 [admin_id, request_id]
             )
+
+            # Dispatch notification email to user
+            user_info = conn.execute(
+                "SELECT id, email, full_name FROM users WHERE id = %s",
+                [target_user_id]
+            ).fetchone()
+            if user_info and user_info.get("email"):
+                target_email = user_info["email"]
+                user_name = user_info.get("full_name") or target_email.split("@")[0]
+                subject = f"Role Upgrade Request Update - Bank Complaint AI Desk"
+                html_content = f"""
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <div style="background: #1e3a8a; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
+                        <h2 style="color: #ffffff; margin: 0; font-size: 20px;">Bank Complaint AI Desk</h2>
+                    </div>
+                    <h3 style="color: #0f172a; margin-top: 0;">Hello {user_name},</h3>
+                    <p style="color: #334155; font-size: 15px; line-height: 1.5;">
+                        Your request to be promoted to <strong>{to_role.upper()}</strong> was reviewed and has not been approved at this time.
+                    </p>
+                    <p style="color: #475569; font-size: 14px;">
+                        Your account continues with its current permissions. If you have questions regarding this decision, please consult your desk administrator.
+                    </p>
+                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                    <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                        Automated notification from Bank Complaint AI Desk Compliance & Governance Engine.
+                    </p>
+                </div>
+                """
+                text_content = f"Hello {user_name}, your request to become {to_role.upper()} was reviewed and not approved at this time."
+                try:
+                    dispatch_email_transport(target_email, subject, html_content, text_content)
+                except Exception as e:
+                    logger.warning(f"Could not dispatch role upgrade rejection email: {e}")
+
             return {"message": "Role upgrade request has been rejected."}
     except HTTPException:
         raise

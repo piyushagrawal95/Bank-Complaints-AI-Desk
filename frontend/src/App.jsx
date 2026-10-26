@@ -365,6 +365,7 @@ function App() {
   const [submittingUpgrade, setSubmittingUpgrade] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState(null);
   const [upgradeError, setUpgradeError] = useState(null);
+  const [livePromotionNotice, setLivePromotionNotice] = useState(null);
   const profileTimeoutRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -461,6 +462,23 @@ function App() {
       .finally(() => setChecking(false));
   }, []);
 
+  // Background sync: polls every 10 seconds to auto-elevate user when admin approves promotion
+  useEffect(() => {
+    if (!user || isSuperAdminUser(user.email) || user.role === "admin") return;
+    const interval = setInterval(() => {
+      getMe()
+        .then((freshUser) => {
+          if (freshUser && freshUser.role && freshUser.role !== user.role) {
+            setUser(freshUser);
+            setLivePromotionNotice(`🎉 Congratulations! Your promotion to ${freshUser.role.toUpperCase()} was approved by Admin!`);
+            getMyRoleUpgradeStatus().then(setUpgradeStatus).catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   function handleLogout() {
     clearToken();
     setUser(null);
@@ -495,6 +513,15 @@ function App() {
 
   return (
     <div className="container">
+      {livePromotionNotice && (
+        <div className="live-promotion-toast">
+          <div className="live-toast-content">
+            <span className="live-toast-icon">🎉</span>
+            <span className="live-toast-text">{livePromotionNotice}</span>
+          </div>
+          <button className="live-toast-close" onClick={() => setLivePromotionNotice(null)}>✕</button>
+        </div>
+      )}
       <header className="topbar">
         <div className="brand-group">
           <div className="logo-shield">
@@ -711,6 +738,28 @@ function App() {
                   </div>
                 ) : (
                   <>
+                    {!upgradeStatus?.has_pending && upgradeStatus?.request?.status === "approved" && (
+                      <div className="upgrade-approved-card">
+                        <div className="upgrade-approved-title">
+                          <span>🎉</span>
+                          <strong>Promotion Approved by Admin!</strong>
+                        </div>
+                        <div className="upgrade-approved-details">
+                          Your request for <strong>{upgradeStatus.request.to_role.toUpperCase()}</strong> was approved. Your elevated permissions are active right now!
+                        </div>
+                      </div>
+                    )}
+                    {!upgradeStatus?.has_pending && upgradeStatus?.request?.status === "rejected" && (
+                      <div className="upgrade-rejected-card">
+                        <div className="upgrade-rejected-title">
+                          <span>ℹ️</span>
+                          <strong>Promotion Request Update</strong>
+                        </div>
+                        <div className="upgrade-rejected-details">
+                          Your recent request for <strong>{upgradeStatus.request.to_role.toUpperCase()}</strong> was reviewed and declined by Admin. You may submit another request when ready.
+                        </div>
+                      </div>
+                    )}
                     {!showUpgradeForm ? (
                       <div style={{ marginTop: "1rem" }}>
                         <button
