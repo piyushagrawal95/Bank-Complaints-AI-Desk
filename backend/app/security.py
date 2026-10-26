@@ -162,7 +162,7 @@ def verify_turnstile_token(token: str | None, client_ip: str | None = None) -> t
 
     secret = (settings.turnstile_secret_key or "").strip()
     if not secret:
-        secret = "1x0000000000000000000000000000000AA"
+        secret = "0x4AAAAAAFmhQpXanIeOQgh5sEMcIlxO1s8"
 
     url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
     payload = {"secret": secret, "response": token.strip()}

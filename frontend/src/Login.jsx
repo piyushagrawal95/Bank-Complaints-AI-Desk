@@ -60,7 +60,7 @@ function Login({ onLoggedIn }) {
     if (mode !== "login" && mode !== "signup") return;
 
     const siteKey =
-      import.meta.env.VITE_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
+      import.meta.env.VITE_TURNSTILE_SITE_KEY || "0x4AAAAAAFmhQvy4ckiwTVO5";
 
     let retryTimer = null;
     let attempts = 0;
