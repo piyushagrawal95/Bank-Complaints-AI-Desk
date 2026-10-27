@@ -27,29 +27,22 @@ US_STATES = {
     "DC", "PR"
 }
 
-STATE_NAMES = {
-    "CALIFORNIA": "CA", "NEW YORK": "NY", "TEXAS": "TX", "FLORIDA": "FL",
-    "ILLINOIS": "IL", "PENNSYLVANIA": "PA", "OHIO": "OH", "GEORGIA": "GA",
-    "MICHIGAN": "MI", "NORTH CAROLINA": "NC", "NEW JERSEY": "NJ", "VIRGINIA": "VA",
-    "WASHINGTON": "WA", "MASSACHUSETTS": "MA", "ARIZONA": "AZ", "COLORADO": "CO",
-}
-
-COMMON_BANKS = [
-    "JPMorgan Chase & Co.",
-    "Bank of America, N.A.",
-    "Wells Fargo & Company",
-    "Citibank, N.A.",
-    "Capital One Financial Corporation",
-    "U.S. Bancorp",
-    "PNC Bank, N.A.",
-    "Truist Financial Corporation",
-    "Goldman Sachs Bank USA",
-    "Discover Bank",
-    "TD Bank US Holding Company",
-    "Synchrony Financial",
-    "American Express Company",
-    "Barclays Bank Delaware",
-    "Navient Solutions, LLC",
+BANK_KEYWORDS = [
+    (["jpmorgan", "chase"], "JPMorgan Chase & Co."),
+    (["bank of america", "bofa"], "Bank of America, N.A."),
+    (["wells fargo"], "Wells Fargo & Company"),
+    (["citibank", "citi "], "Citibank, N.A."),
+    (["capital one"], "Capital One Financial Corporation"),
+    (["pnc"], "PNC Bank, N.A."),
+    (["discover"], "Discover Bank"),
+    (["truist"], "Truist Financial Corporation"),
+    (["us bank", "u.s. bank", "us bancorp"], "U.S. Bancorp"),
+    (["goldman sachs"], "Goldman Sachs Bank USA"),
+    (["td bank"], "TD Bank US Holding Company"),
+    (["synchrony"], "Synchrony Financial"),
+    (["american express", "amex"], "American Express Company"),
+    (["barclays"], "Barclays Bank Delaware"),
+    (["navient"], "Navient Solutions, LLC"),
 ]
 
 
@@ -78,24 +71,13 @@ def extract_raw_text(filename: str, content: bytes) -> str:
                     paragraphs.append(row_text)
         return "\n\n".join(paragraphs).strip()
 
-    if fn.endswith(".xlsx") or fn.endswith(".xls"):
-        import pandas as pd
-        # Read first available sheet
-        df = pd.read_excel(io.BytesIO(content), dtype=str)
-        # Convert non-empty cells to readable text representation
-        lines = []
-        # Check column headers
-        lines.append("Columns: " + ", ".join(str(c) for c in df.columns if not str(c).startswith("Unnamed")))
-        for _, row in df.head(100).iterrows():
-            row_items = [f"{col}: {val}" for col, val in row.items() if pd.notna(val) and str(val).strip()]
-            if row_items:
-                lines.append(" | ".join(row_items))
-        return "\n".join(lines).strip()
-
-    if fn.endswith(".csv"):
+    if fn.endswith(".xlsx") or fn.endswith(".xls") or fn.endswith(".csv"):
         import pandas as pd
         try:
-            df = pd.read_csv(io.BytesIO(content), dtype=str)
+            if fn.endswith(".csv"):
+                df = pd.read_csv(io.BytesIO(content), dtype=str)
+            else:
+                df = pd.read_excel(io.BytesIO(content), dtype=str)
             lines = ["Columns: " + ", ".join(str(c) for c in df.columns if not str(c).startswith("Unnamed"))]
             for _, row in df.head(100).iterrows():
                 row_items = [f"{col}: {val}" for col, val in row.items() if pd.notna(val) and str(val).strip()]
@@ -103,96 +85,140 @@ def extract_raw_text(filename: str, content: bytes) -> str:
                     lines.append(" | ".join(row_items))
             return "\n".join(lines).strip()
         except Exception:
-            text = content.decode("utf-8", errors="replace")
-            return text
+            return content.decode("utf-8", errors="replace").strip()
 
-    # Default text decode for txt or unknown
     return content.decode("utf-8", errors="replace").strip()
 
 
 def parse_complaint_from_text(raw_text: str, filename: str = "") -> dict:
-    """Parses complaint attributes, consumer email, and narrative from raw text."""
+    """Parses complaint attributes, consumer email, and narrative from text chunk."""
     lower_text = raw_text.lower()
 
     # 1. Consumer Email extraction
     email_match = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b", raw_text)
-    consumer_email = email_match.group(0).strip() if email_match else ""
+    consumer_email = email_match.group(0).strip().lower() if email_match else ""
 
-    # 2. Product inference
-    product = "Checking or savings account"
-    if "credit card" in lower_text or "prepaid card" in lower_text:
-        product = "Credit card or prepaid card"
-    elif "mortgage" in lower_text:
-        product = "Mortgage"
-    elif "debt" in lower_text and ("collect" in lower_text or "agency" in lower_text):
-        product = "Debt collection"
-    elif "credit report" in lower_text or "credit reporting" in lower_text or "bureau" in lower_text:
-        product = "Credit reporting, credit repair services, or other personal consumer reports"
-    elif "student loan" in lower_text:
-        product = "Student loan"
-    elif "vehicle" in lower_text or "car loan" in lower_text or "auto loan" in lower_text:
-        product = "Vehicle loan or lease"
-    elif "money transfer" in lower_text or "wire" in lower_text or "remittance" in lower_text:
-        product = "Money transfer, virtual currency, or money service"
-    elif "payday" in lower_text or "personal loan" in lower_text:
-        product = "Payday loan, title loan, or personal loan"
-
-    # 3. Company / Bank identification
-    company = "JPMorgan Chase & Co."
-    for b in COMMON_BANKS:
-        # Check standard short name tokens
-        tokens = [t.lower() for t in b.replace(",", "").replace(".", "").split() if len(t) > 3]
-        if any(token in lower_text for token in tokens):
-            company = b
-            break
-
-    # Look for explicit field: Company: XYZ or Bank: XYZ
-    comp_match = re.search(r"(?:company|bank|financial institution)\s*:\s*([^\n\r,]+)", raw_text, re.IGNORECASE)
+    # 2. Company / Bank identification (explicit key-value with newline tolerance)
+    company = ""
+    comp_match = re.search(
+        r"(?:bank\s*/\s*institution|company|bank|financial institution)\s*:\s*[\r\n]*\s*([^\r\n]+)",
+        raw_text,
+        re.IGNORECASE,
+    )
     if comp_match:
-        c_val = comp_match.group(1).strip()
-        if len(c_val) >= 3:
-            company = c_val
+        c_cand = comp_match.group(1).strip()
+        if len(c_cand) > 3 and not c_cand.lower().startswith("dispute") and not c_cand.lower().startswith("product"):
+            for keys, bname in BANK_KEYWORDS:
+                if any(k in c_cand.lower() for k in keys):
+                    company = bname
+                    break
+            if not company:
+                company = c_cand
 
-    # 4. State & ZIP identification
+    if not company:
+        for keys, bname in BANK_KEYWORDS:
+            if any(k in lower_text for k in keys):
+                company = bname
+                break
+    if not company:
+        company = "JPMorgan Chase & Co."
+
+    # 3. Product inference
+    product = ""
+    prod_match = re.search(
+        r"(?:product\s*vertical|account\s*product|product)\s*:\s*[\r\n]*\s*([^\r\n]+)",
+        raw_text,
+        re.IGNORECASE,
+    )
+    if prod_match:
+        p_cand = prod_match.group(1).strip()
+        for sp in STANDARD_PRODUCTS:
+            if sp.lower() in p_cand.lower() or p_cand.lower() in sp.lower():
+                product = sp
+                break
+        if not product and len(p_cand) > 4:
+            product = p_cand
+
+    if not product:
+        if "credit card" in lower_text or "prepaid card" in lower_text:
+            product = "Credit card or prepaid card"
+        elif "mortgage" in lower_text:
+            product = "Mortgage"
+        elif "debt" in lower_text and ("collect" in lower_text or "agency" in lower_text):
+            product = "Debt collection"
+        elif "credit report" in lower_text or "bureau" in lower_text:
+            product = "Credit reporting, credit repair services, or other personal consumer reports"
+        elif "vehicle" in lower_text or "auto loan" in lower_text or "car loan" in lower_text:
+            product = "Vehicle loan or lease"
+        elif "wire" in lower_text or "money transfer" in lower_text or "remittance" in lower_text:
+            product = "Money transfer, virtual currency, or money service"
+        elif "student loan" in lower_text:
+            product = "Student loan"
+        elif "payday" in lower_text or "personal loan" in lower_text:
+            product = "Payday loan, title loan, or personal loan"
+        else:
+            product = "Checking or savings account"
+
+    # 4. Issue extraction
+    issue = ""
+    issue_match = re.search(
+        r"(?:dispute\s*issue|primary\s*issue|dispute\s*reason|issue|subject)\s*:\s*[\r\n]*\s*([^\r\n]+)",
+        raw_text,
+        re.IGNORECASE,
+    )
+    if issue_match:
+        i_cand = issue_match.group(1).strip()
+        if len(i_cand) > 4 and not i_cand.lower().startswith("bank") and not i_cand.lower().startswith("product"):
+            issue = i_cand[:120]
+
+    if not issue:
+        if "unauthorized" in lower_text:
+            issue = "Problem with unauthorized transaction"
+        elif "duplicate" in lower_text or "double" in lower_text:
+            issue = "Billing error or duplicate charge"
+        elif "late fee" in lower_text:
+            issue = "Excessive or incorrect fee assessment"
+        elif "wire" in lower_text:
+            issue = "Problem with wire transfer or delayed funds"
+        else:
+            issue = "Customer dispute regarding account or transaction"
+
+    # 5. State & ZIP identification
     state = "NY"
     zip_code = ""
 
-    zip_match = re.search(r"\b(\d{5})(?:-\d{4})?\b", raw_text)
-    if zip_match:
-        zip_code = zip_match.group(1)
-
-    state_match = re.search(r"(?:state)\s*:\s*([A-Za-z]{2,20})", raw_text, re.IGNORECASE)
+    state_match = re.search(r"(?:state)\s*:\s*[\r\n]*\s*([A-Za-z]{2})", raw_text, re.IGNORECASE)
     if state_match:
         cand_state = state_match.group(1).strip().upper()
         if cand_state in US_STATES:
             state = cand_state
-        elif cand_state in STATE_NAMES:
-            state = STATE_NAMES[cand_state]
-    else:
-        # Check isolated 2-letter tokens in uppercase
-        for st in US_STATES:
-            if re.search(r"\b" + st + r"\b", raw_text):
-                state = st
-                break
 
-    # 5. Issue extraction
-    issue = ""
-    issue_match = re.search(r"(?:issue|subject|regarding|re)\s*:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
-    if issue_match:
-        cand_issue = issue_match.group(1).strip()
-        if len(cand_issue) > 4:
-            issue = cand_issue[:100]
+    zip_match = re.search(r"(?:zip|postal)(?:\s*code)?\s*:\s*[\r\n]*\s*(\d{5})", raw_text, re.IGNORECASE)
+    if zip_match:
+        zip_code = zip_match.group(1).strip()
+    elif not zip_code:
+        zm = re.search(r"\b(\d{5})(?:-\d{4})?\b", raw_text)
+        if zm:
+            zip_code = zm.group(1)
 
-    if not issue:
-        # Infer issue based on product or first meaningful line
-        lines = [l.strip() for l in raw_text.splitlines() if len(l.strip()) > 15]
-        if lines:
-            issue = lines[0][:100]
-        else:
-            issue = "Managing an account or service issue"
+    # 6. Narrative cleaning (extract grievance text, filter out metadata label lines)
+    clean_lines = []
+    for line in raw_text.splitlines():
+        l_strip = line.strip()
+        if not l_strip:
+            continue
+        if re.match(
+            r"(?i)^(?:bank\s*/\s*institution|product\s*vertical|consumer\s*email|dispute\s*issue|customer\s*name|date\s*of\s*notice|state|zip\s*code|---)\s*:",
+            l_strip,
+        ):
+            continue
+        if l_strip.lower() in [company.lower(), product.lower(), consumer_email.lower(), issue.lower()]:
+            continue
+        clean_lines.append(l_strip)
 
-    # 6. Narrative
-    narrative = raw_text.strip()
+    narrative = "\n".join(clean_lines).strip()
+    if len(narrative) < 15:
+        narrative = raw_text.strip()
     if len(narrative) > 8000:
         narrative = narrative[:8000] + "... [narrative truncated]"
 
@@ -212,12 +238,11 @@ def parse_complaint_from_text(raw_text: str, filename: str = "") -> dict:
     }
 
 
-
 def extract_complaints_from_file(filename: str, content: bytes) -> dict:
     """Extracts either a single complaint or multiple complaints from PDF, Word, Excel, CSV."""
     fn = filename.lower()
 
-    # 1. Check Excel / CSV for multiple rows
+    # 1. Process Excel / CSV files
     if fn.endswith(".xlsx") or fn.endswith(".xls") or fn.endswith(".csv"):
         import pandas as pd
         try:
@@ -235,14 +260,14 @@ def extract_complaints_from_file(filename: str, content: bytes) -> dict:
                                 return col
                     return None
 
-                c_company = find_col(["company", "bank", "institution", "lender"])
+                c_company = find_col(["company", "bank", "institution", "lender", "entity"])
                 c_product = find_col(["product", "category", "vertical", "account type"])
                 c_issue = find_col(["issue", "subject", "dispute", "reason", "type"])
                 c_email = find_col(["email", "mail", "consumer email", "customer email"])
-                c_narrative = find_col(["narrative", "story", "complaint", "details", "description", "comment"])
+                c_narrative = find_col(["narrative", "story", "complaint", "details", "description", "comment", "text"])
                 c_state = find_col(["state"])
                 c_zip = find_col(["zip", "postal"])
-                c_date = find_col(["date", "received"])
+                c_date = find_col(["date", "received", "timestamp"])
 
                 records = []
                 for _, row in df.iterrows():
@@ -256,24 +281,28 @@ def extract_complaints_from_file(filename: str, content: bytes) -> dict:
                     if len(narr) < 10:
                         continue
 
-                    parsed = parse_complaint_from_text(narr, filename)
+                    company_val = str(row[c_company]).strip() if c_company and pd.notna(row.get(c_company)) else "JPMorgan Chase & Co."
+                    product_val = str(row[c_product]).strip() if c_product and pd.notna(row.get(c_product)) else "Checking or savings account"
+                    issue_val = str(row[c_issue]).strip() if c_issue and pd.notna(row.get(c_issue)) else "Dispute reported"
+                    email_val = str(row[c_email]).strip().lower() if c_email and pd.notna(row.get(c_email)) else ""
+                    state_val = str(row[c_state]).strip().upper()[:2] if c_state and pd.notna(row.get(c_state)) else "NY"
+                    zip_val = str(row[c_zip]).strip()[:10] if c_zip and pd.notna(row.get(c_zip)) else ""
+                    date_val = str(row[c_date]).strip()[:10] if c_date and pd.notna(row.get(c_date)) else date.today().isoformat()
 
-                    if c_company and pd.notna(row.get(c_company)) and str(row[c_company]).strip():
-                        parsed["company"] = str(row[c_company]).strip()
-                    if c_product and pd.notna(row.get(c_product)) and str(row[c_product]).strip():
-                        parsed["product"] = str(row[c_product]).strip()
-                    if c_issue and pd.notna(row.get(c_issue)) and str(row[c_issue]).strip():
-                        parsed["issue"] = str(row[c_issue]).strip()
-                    if c_email and pd.notna(row.get(c_email)) and str(row[c_email]).strip():
-                        parsed["consumer_email"] = str(row[c_email]).strip().lower()
-                    if c_state and pd.notna(row.get(c_state)) and str(row[c_state]).strip():
-                        parsed["state"] = str(row[c_state]).strip().upper()[:2]
-                    if c_zip and pd.notna(row.get(c_zip)) and str(row[c_zip]).strip():
-                        parsed["zip_code"] = str(row[c_zip]).strip()[:10]
-                    if c_date and pd.notna(row.get(c_date)) and str(row[c_date]).strip():
-                        parsed["date_received"] = str(row[c_date]).strip()[:10]
-
-                    records.append(parsed)
+                    records.append({
+                        "filename": f"{filename} (Row #{len(records)+1})",
+                        "company": company_val,
+                        "product": product_val,
+                        "sub_product": None,
+                        "issue": issue_val,
+                        "sub_issue": None,
+                        "consumer_email": email_val,
+                        "state": state_val if state_val in US_STATES else "NY",
+                        "zip_code": zip_val,
+                        "narrative": narr,
+                        "date_received": date_val,
+                        "submitted_via": "Bulk File Upload",
+                    })
 
                 if len(records) > 1:
                     return {
@@ -289,24 +318,31 @@ def extract_complaints_from_file(filename: str, content: bytes) -> dict:
     # 2. Check PDF / Text for multiple distinct sections
     raw_text = extract_raw_text(filename, content)
 
-    split_pattern = r"(?i)(?:^|\n)(?:[-=]{3,}\s*(?:dispute|complaint|record|case)\s*#?\d*.*?[-=]{3,}|(?:dispute|complaint|case)\s*#\s*\d+\s*:)"
+    split_pattern = r"(?i)(?:^|\n)(?:[-=]{3,}\s*(?:dispute|complaint|record|case)\s*#?\d*.*?[-=]{3,})"
     chunks = re.split(split_pattern, raw_text)
-    meaningful_chunks = [c.strip() for c in chunks if len(c.strip()) > 50]
 
-    if len(meaningful_chunks) > 1:
-        records = []
-        for idx, chunk in enumerate(meaningful_chunks, 1):
-            p = parse_complaint_from_text(chunk, f"{filename} (Record #{idx})")
-            if p and len(p.get("narrative", "")) > 10:
-                records.append(p)
-        if len(records) > 1:
-            return {
-                "is_batch": True,
-                "count": len(records),
-                "records": records,
-                "extracted": records[0],
-                "raw_text": raw_text,
-            }
+    records = []
+    for idx, chunk in enumerate(chunks):
+        chunk_clean = chunk.strip()
+        has_email = "@" in chunk_clean
+        has_bank = any(k in chunk_clean.lower() for keys, b in BANK_KEYWORDS for k in keys)
+        has_dispute = any(w in chunk_clean.lower() for w in ["unauthorized", "charge", "fee", "dispute", "statement", "refund", "delayed"])
+
+        if not (has_email or (has_bank and has_dispute)) or len(chunk_clean) < 40:
+            continue
+
+        p = parse_complaint_from_text(chunk_clean, f"{filename} (Record #{len(records)+1})")
+        if p and len(p.get("narrative", "")) > 10:
+            records.append(p)
+
+    if len(records) > 1:
+        return {
+            "is_batch": True,
+            "count": len(records),
+            "records": records,
+            "extracted": records[0],
+            "raw_text": raw_text,
+        }
 
     # 3. Default single complaint
     single = parse_complaint_from_text(raw_text, filename)
