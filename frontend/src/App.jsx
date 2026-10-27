@@ -368,6 +368,8 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
 function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("complaints");
+  const [authModal, setAuthModal] = useState(null);
+  const [directSelectedId, setDirectSelectedId] = useState(null);
   const [checking, setChecking] = useState(Boolean(getToken()));
   const [profileOpen, setProfileOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
