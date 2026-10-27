@@ -21,15 +21,12 @@ export default function LandingPage({ onOpenAuth }) {
             </div>
             <div className="brand-text-group">
               <span className="brand-heading">Bank Complaint AI Desk</span>
-              <span className="brand-edition">v2.1.0 Enterprise</span>
+              <span className="brand-edition">Enterprise Edition</span>
             </div>
           </div>
 
           <nav className="landing-nav-links">
             <a href="#features">Features</a>
-            <a href="#compliance">Rulebooks</a>
-            <a href="#architecture">Architecture</a>
-            <a href="#security">Security</a>
           </nav>
 
           <div className="landing-nav-actions">
@@ -55,7 +52,7 @@ export default function LandingPage({ onOpenAuth }) {
         <div className="hero-content">
           <div className="hero-pill-tag">
             <IconSparkles size={14} />
-            <span>Next-Generation CFPB & Banking Compliance Operating System</span>
+            <span>AI-Powered Banking Compliance & Dispute Intelligence Operating System</span>
           </div>
 
           <h1 className="hero-title">
@@ -65,7 +62,7 @@ export default function LandingPage({ onOpenAuth }) {
 
           <p className="hero-subtitle">
             Automate dispute triage, accelerate compliance investigations under
-            Regulations E, Z, V & F, and equip compliance teams with instant RAG
+            federal regulations, and equip compliance teams with instant RAG
             citations, universal file ingestion, and audited resolution drafting.
           </p>
 
@@ -74,7 +71,7 @@ export default function LandingPage({ onOpenAuth }) {
               className="hero-btn-primary"
               onClick={() => onOpenAuth("login")}
             >
-              Access Dispute Portal →
+              Get Started →
             </button>
             <button
               className="hero-btn-secondary"
@@ -82,26 +79,6 @@ export default function LandingPage({ onOpenAuth }) {
             >
               Create Account
             </button>
-          </div>
-
-          {/* STATS STRIP */}
-          <div className="hero-stats-grid">
-            <div className="stat-card">
-              <span className="stat-number">19,090+</span>
-              <span className="stat-label">Ingested CFPB Disputes</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-number">12,824</span>
-              <span className="stat-label">Indexed Rulebook Chunks</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-number">0.82s</span>
-              <span className="stat-label">Groq Llama-3.3 Inference</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-number">91.4%</span>
-              <span className="stat-label">CFR Citation Precision</span>
-            </div>
           </div>
         </div>
       </section>
@@ -132,7 +109,7 @@ export default function LandingPage({ onOpenAuth }) {
             </div>
             <h3 className="feature-heading">"Ask the Rules" RAG Engine</h3>
             <p className="feature-text">
-              Queries federal rulebooks across 12 CFR Part 1005 (Reg E), Part 1026 (Reg Z), Part 1022 (Reg V), and Part 1006 (Reg F) with exact section citations and page numbers.
+              Queries federal rulebooks across official banking regulations with exact section citations and page numbers for compliance officers.
             </p>
           </div>
 
@@ -142,7 +119,7 @@ export default function LandingPage({ onOpenAuth }) {
             </div>
             <h3 className="feature-heading">AI Categorization & 2-Sentence Briefs</h3>
             <p className="feature-text">
-              Instantly maps customer grievances into 8 standardized banking taxonomy classes with cached executive summaries served in under 25 milliseconds.
+              Instantly maps customer grievances into standardized banking taxonomy classes with cached executive summaries served in sub-second speeds.
             </p>
           </div>
 
@@ -162,7 +139,7 @@ export default function LandingPage({ onOpenAuth }) {
             </div>
             <h3 className="feature-heading">Volume Surge & Outage Alerts</h3>
             <p className="feature-text">
-              Real-time anomaly detection tracks rolling time-series counts against historical baselines, triggering operational alerts when complaint spikes exceed 30%.
+              Real-time anomaly detection tracks rolling time-series counts against historical baselines, triggering operational alerts when complaint spikes occur.
             </p>
           </div>
 
@@ -174,36 +151,6 @@ export default function LandingPage({ onOpenAuth }) {
             <p className="feature-text">
               Memory-hard Scrypt password hashing, Google OAuth 2.0 with clock-skew tolerance, Cloudflare Turnstile bot protection, and multi-tier role upgrade workflows.
             </p>
-          </div>
-        </div>
-      </section>
-
-      {/* COMPLIANCE STATUTORY DEADLINES BANNER */}
-      <section id="compliance" className="landing-section compliance-strip">
-        <div className="compliance-card">
-          <div className="compliance-badge">Statutory Protection</div>
-          <h2 className="compliance-title">Meeting Non-Negotiable Federal Mandates</h2>
-          <div className="compliance-grid">
-            <div className="compliance-item">
-              <span className="rule-badge">Regulation E (§ 1005.11)</span>
-              <h4>10 Business Days</h4>
-              <p>Mandatory error investigation or provisional credit with extension up to 45 calendar days for electronic fund transfers.</p>
-            </div>
-            <div className="compliance-item">
-              <span className="rule-badge">Regulation Z (§ 1026.13)</span>
-              <h4>30 Days / 2 Cycles</h4>
-              <p>Strict billing error acknowledgment within 30 days and dispute resolution within 2 complete billing cycles for credit cards.</p>
-            </div>
-            <div className="compliance-item">
-              <span className="rule-badge">Regulation V (§ 611)</span>
-              <h4>30 Calendar Days</h4>
-              <p>Mandatory completion of direct consumer credit reporting disputes with credit bureaus and furnishers.</p>
-            </div>
-            <div className="compliance-item">
-              <span className="rule-badge">Regulation F (§ 1006.6)</span>
-              <h4>Strict Contact Windows</h4>
-              <p>Debt collection communication limited between 8:00 AM and 9:00 PM local time with harassment prevention boundaries.</p>
-            </div>
           </div>
         </div>
       </section>
