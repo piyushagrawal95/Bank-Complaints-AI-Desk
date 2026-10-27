@@ -281,32 +281,49 @@ def batch_create_complaints(body: BatchCreateIn, user: dict = Depends(get_curren
     created_list = []
     try:
         with pool.connection() as conn:
-            with conn.cursor() as cur:
-                for item in body.complaints:
-                    date_rcvd = item.date_received or date.today()
-                    clean_email = (item.consumer_email or "").strip().lower() or None
-                    clean_state = (item.state or "").strip().upper() or "NY"
-                    clean_zip = (item.zip_code or "").strip() or None
+            # Find current max complaint_id
+            max_row = conn.execute(
+                "SELECT COALESCE(MAX(complaint_id), 1700000) AS max_id FROM complaints"
+            ).fetchone()
+            current_id = int(max_row["max_id"]) if max_row else 1700000
 
-                    cur.execute(
-                        """
-                        INSERT INTO complaints (
-                            product, sub_product, issue, sub_issue,
-                            company, state, zip_code, consumer_email,
-                            consumer_complaint_narrative, submitted_via,
-                            date_received
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        RETURNING complaint_id, product, company, issue, consumer_email, date_received;
-                        """,
-                        (
-                            item.product, item.sub_product, item.issue, item.sub_issue,
-                            item.company, clean_state, clean_zip, clean_email,
-                            item.narrative, "Bulk File Upload",
-                            date_rcvd,
-                        ),
-                    )
-                    row = cur.fetchone()
-                    created_list.append(row)
+            insert_sql = """
+                INSERT INTO complaints (
+                    complaint_id, date_received, product, sub_product, issue, sub_issue,
+                    narrative, company, state, zip_code, submitted_via,
+                    consumer_email, timely_response, date_sent_to_company
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s
+                )
+                RETURNING complaint_id, product, company, issue, consumer_email, date_received;
+            """
+
+            for item in body.complaints:
+                current_id += 1
+                date_rcvd = item.date_received or date.today()
+                clean_email = (item.consumer_email or "").strip().lower() or None
+                clean_state = (item.state or "").strip().upper() or "NY"
+                clean_zip = (item.zip_code or "").strip() or None
+
+                row = conn.execute(
+                    insert_sql,
+                    [
+                        current_id,
+                        date_rcvd,
+                        item.product.strip() if item.product else "Checking or savings account",
+                        item.sub_product.strip() if item.sub_product else None,
+                        item.issue.strip() if item.issue else "Dispute reported",
+                        item.sub_issue.strip() if item.sub_issue else None,
+                        item.narrative.strip() if item.narrative else "Customer dispute details submitted via batch file.",
+                        item.company.strip() if item.company else "JPMorgan Chase & Co.",
+                        clean_state,
+                        clean_zip,
+                        "Bulk File Upload",
+                        clean_email,
+                        date_rcvd,
+                    ],
+                ).fetchone()
+                created_list.append(row)
             conn.commit()
         return {"success": True, "count": len(created_list), "complaints": created_list}
     except Exception as exc:

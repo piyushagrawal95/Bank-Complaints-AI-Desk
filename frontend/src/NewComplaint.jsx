@@ -282,6 +282,8 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
             </table>
           </div>
 
+          {error && <div className="form-error-banner">{error}</div>}
+
           <div className="batch-actions-row">
             <button
               className="btn-primary"
