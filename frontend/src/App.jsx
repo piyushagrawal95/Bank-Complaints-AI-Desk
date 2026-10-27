@@ -14,6 +14,8 @@ import ComplaintDetail from "./ComplaintDetail";
 import Login from "./Login";
 import Trends from "./Trends";
 import UserManagement from "./UserManagement";
+import LandingPage from "./LandingPage";
+import NewComplaint from "./NewComplaint";
 import {
   IconComplaints,
   IconLogout,
@@ -77,7 +79,7 @@ function renderResponseBadge(resp = "") {
   return <span className="response-pill resp-default">{resp || "Under Review"}</span>;
 }
 
-function ComplaintsPage({ currentUser }) {
+function ComplaintsPage({ currentUser, initialSelectedId = null }) {
   const [draft, setDraft] = useState(EMPTY);
   const [filters, setFilters] = useState(EMPTY);
   const [page, setPage] = useState(1);
@@ -85,7 +87,13 @@ function ComplaintsPage({ currentUser }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(initialSelectedId);
+
+  useEffect(() => {
+    if (initialSelectedId) {
+      setSelectedId(initialSelectedId);
+    }
+  }, [initialSelectedId]);
 
   useEffect(() => {
     getProducts().then(setProducts).catch(() => setProducts([]));
@@ -292,6 +300,11 @@ function ComplaintsPage({ currentUser }) {
                                 {c.sub_issue}
                               </span>
                             )}
+                            {c.consumer_email && (
+                              <span className="email-table-tag" title={c.consumer_email}>
+                                ✉ {c.consumer_email}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td>
@@ -471,6 +484,7 @@ function App() {
       if (e.key === "Escape") {
         setShowProfileModal(false);
         setProfileOpen(false);
+        setAuthModal(null);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -532,7 +546,37 @@ function App() {
   }
 
   if (!user) {
-    return <Login onLoggedIn={setUser} />;
+    return (
+      <>
+        <LandingPage onOpenAuth={(mode) => setAuthModal(mode || "login")} />
+        {authModal && (
+          <div
+            className="auth-modal-backdrop"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setAuthModal(null);
+            }}
+          >
+            <div className="auth-modal-container">
+              <button
+                className="auth-modal-close"
+                onClick={() => setAuthModal(null)}
+                title="Close (Esc)"
+              >
+                ✕
+              </button>
+              <Login
+                onLoggedIn={(newUser) => {
+                  setUser(newUser);
+                  setAuthModal(null);
+                }}
+                initialMode={authModal}
+                onClose={() => setAuthModal(null)}
+              />
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   const isSuper = isSuperAdminUser(user.email);
@@ -656,9 +700,18 @@ function App() {
       <nav className="tabs">
         <button
           className={"tab" + (view === "complaints" ? " active" : "")}
-          onClick={() => setView("complaints")}
+          onClick={() => {
+            setView("complaints");
+            setDirectSelectedId(null);
+          }}
         >
           <IconComplaints size={16} /> Complaints
+        </button>
+        <button
+          className={"tab" + (view === "new-complaint" ? " active" : "")}
+          onClick={() => setView("new-complaint")}
+        >
+          <IconComplaints size={16} /> + New Complaint
         </button>
         <button
           className={"tab" + (view === "rules" ? " active" : "")}
@@ -687,12 +740,23 @@ function App() {
       <main className="main-content">
         {view === "rules" ? (
           <AskRules />
+        ) : view === "new-complaint" ? (
+          <NewComplaint
+            onViewComplaint={(newId) => {
+              setDirectSelectedId(newId);
+              setView("complaints");
+            }}
+            onGoToComplaints={() => {
+              setDirectSelectedId(null);
+              setView("complaints");
+            }}
+          />
         ) : showTrends ? (
           <Trends />
         ) : view === "users" && canManageUsers ? (
           <UserManagement currentUser={user} />
         ) : (
-          <ComplaintsPage currentUser={user} />
+          <ComplaintsPage currentUser={user} initialSelectedId={directSelectedId} />
         )}
       </main>
 

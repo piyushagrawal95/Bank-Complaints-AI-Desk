@@ -40,11 +40,11 @@ async function request(path, { method = "GET", params = {}, body } = {}) {
 
   let response;
   try {
-    response = await fetch(url, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    const fetchOptions = { method, headers };
+    if (body !== undefined) {
+      fetchOptions.body = JSON.stringify(body);
+    }
+    response = await fetch(url, fetchOptions);
   } catch {
     throw new Error("Cannot reach the backend server. Please verify it is running on port 8000.");
   }
@@ -75,7 +75,7 @@ async function request(path, { method = "GET", params = {}, body } = {}) {
         message = errorMsgs.filter(Boolean).join(". ") || "Please verify the submitted form values.";
       } else if (typeof data.message === "string" && data.message.trim()) {
         message = data.message;
-      } else if (typeof data.error === "string" && data.error.trim() ) {
+      } else if (typeof data.error === "string" && data.error.trim()) {
         message = data.error;
       }
     } catch {
@@ -133,8 +133,42 @@ export const analyzeComplaint = (id, refresh = false) =>
 export const getSimilarComplaints = (id) => request(`/complaints/${id}/similar`);
 export const draftReply = (id, instructions = "") =>
   request(`/complaints/${id}/draft-reply`, { method: "POST", body: { custom_instructions: instructions } });
+export const requestComplaintApproval = (id, response_text) =>
+  request(`/complaints/${id}/request-approval`, { method: "POST", body: { response_text } });
 export const approveComplaintResponse = (id, response_text) =>
   request(`/complaints/${id}/approve`, { method: "POST", body: { response_text } });
+export const updateComplaintEmail = (id, consumer_email) =>
+  request(`/complaints/${id}/email`, { method: "PUT", body: { consumer_email } });
+export const createComplaint = (data) =>
+  request("/complaints/create", { method: "POST", body: data });
+
+export async function extractComplaintFile(file) {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/complaints/extract-file`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let msg = `Extraction failed (${res.status})`;
+    try {
+      const err = await res.json();
+      if (err.detail) msg = err.detail;
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export const dispatchComplaintResponse = (id) =>
   request(`/complaints/${id}/dispatch`, { method: "POST" });
 
@@ -179,4 +213,3 @@ export async function verifyEmail(token) {
     body: { token },
   });
 }
-

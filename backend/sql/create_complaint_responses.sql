@@ -2,11 +2,15 @@
 CREATE TABLE IF NOT EXISTS complaint_responses (
     complaint_id BIGINT PRIMARY KEY REFERENCES complaints(complaint_id) ON DELETE CASCADE,
     response_text TEXT NOT NULL,
+    requested_by_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    requested_by_name TEXT,
+    requested_by_role TEXT,
+    requested_at TIMESTAMPTZ,
     approved_by_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
     approved_by_name TEXT,
     approved_by_role TEXT,
-    status TEXT NOT NULL DEFAULT 'approved',
-    approved_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    status TEXT NOT NULL DEFAULT 'draft',
+    approved_at TIMESTAMPTZ,
     dispatched_at TIMESTAMPTZ
 );
 

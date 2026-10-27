@@ -30,8 +30,11 @@ function EyeIcon({ off }) {
   );
 }
 
-function Login({ onLoggedIn }) {
-  const [mode, setMode] = useState("login"); // "login", "signup", "forgot", "reset"
+function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
+  const [mode, setMode] = useState(initialMode);
+  useEffect(() => {
+    if (initialMode) setMode(initialMode);
+  }, [initialMode]); // "login", "signup", "forgot", "reset"
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

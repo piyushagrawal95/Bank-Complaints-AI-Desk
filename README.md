@@ -3,13 +3,16 @@
 AI-powered Complaint Intelligence & Regulatory Compliance System for Banks (CFPB Complaints + Regulation E RAG).
 
 ## Features
+- **Interactive Landing Page & Modal Auth**: High-impact enterprise landing page with live operational statistics and sleek popup modal authentication.
+- **Universal Multi-Format Ingestion**: Record disputes manually or auto-extract complaint narratives, product categories, and consumer emails from PDF, Word (.docx), Excel (.xlsx/.xls), CSV, or TXT documents.
 - **Large Dataset Ingestion**: Streams millions of CFPB complaint records using memory-efficient chunking.
 - **Fast Filtered Search**: Full-text and multi-parameter filtering (by product, company, state, dates).
 - **AI Categorization & Summarization**: Classifies issues into banking categories and generates 2-sentence executive summaries with PostgreSQL caching.
-- **"Ask the Rules" RAG System**: Natural-language query interface against official federal banking rulebooks (Regulation E - 12 CFR Part 1005) with exact CFR section and PDF page citations using `pgvector` HNSW indexing.
-- **Similar Past Cases & AI Reply Drafting**: Vector search to retrieve past resolved complaints and draft compliant response letters for human approval.
+- **"Ask the Rules" RAG System**: Natural-language query interface against official federal banking rulebooks (Regulation E - 12 CFR Part 1005, Reg Z, Reg V, Reg F) with exact CFR section and PDF page citations using `pgvector` HNSW indexing.
+- **Similar Past Cases & AI Reply Drafting**: Vector search to retrieve past resolved complaints and draft compliant response letters.
+- **Role-Based Resolution Approval & Email Dispatch**: Agents submit drafted letters for review; Supervisors and Admins formally approve and automatically dispatch resolution notification emails to the consumer.
 - **Trends & Volume Spike Detection**: Anomaly detection comparing rolling window traffic against historical baselines with supervisor alerts.
-- **Full Authentication & RBAC**: Scrypt password hashing, JWT tokens, email-based password reset, and role enforcement (`agent`, `supervisor`, `admin`).
+- **Full Authentication & RBAC**: Scrypt password hashing, JWT tokens, Google OAuth 2.0 with clock-skew tolerance, Cloudflare Turnstile CAPTCHA, and role enforcement (`agent`, `supervisor`, `admin`).
 - **Switchable AI Models**: Change between Groq and OpenAI via `.env` settings without modifying code.
 
 ---

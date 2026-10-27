@@ -1,12 +1,15 @@
 import logging
 from datetime import date
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from pydantic import BaseModel, EmailStr, Field
 
 from app.core.config import settings
 from app.db import pool
 from app.deps import get_current_user
+from app.email_service import send_complaint_approval_email
+from app.file_extractor import extract_raw_text, parse_complaint_from_text
 from app.llm.analysis import (
     BASIS_METADATA,
     BASIS_NARRATIVE,
@@ -22,12 +25,38 @@ router = APIRouter(prefix="/complaints", tags=["complaints"], dependencies=[Depe
 
 LIST_COLUMNS = (
     "complaint_id, date_received, product, sub_product, issue, company, "
-    "state, submitted_via, company_response_to_consumer, timely_response"
+    "state, submitted_via, company_response_to_consumer, timely_response, consumer_email"
 )
 
 
 class DraftReplyIn(BaseModel):
     custom_instructions: str | None = Field(default=None, max_length=500)
+
+
+class UpdateEmailIn(BaseModel):
+    consumer_email: EmailStr
+
+
+class CreateComplaintIn(BaseModel):
+    product: str = Field(min_length=2, max_length=200)
+    sub_product: str | None = Field(default=None, max_length=200)
+    issue: str = Field(min_length=2, max_length=200)
+    sub_issue: str | None = Field(default=None, max_length=200)
+    company: str = Field(min_length=2, max_length=200)
+    state: str | None = Field(default=None, max_length=10)
+    zip_code: str | None = Field(default=None, max_length=20)
+    consumer_email: str | None = Field(default=None, max_length=255)
+    narrative: str = Field(min_length=5, max_length=15000)
+    date_received: date | None = None
+    submitted_via: str = Field(default="Web Portal", max_length=50)
+
+
+class RequestApprovalIn(BaseModel):
+    response_text: str = Field(min_length=10)
+
+
+class ApproveResponseIn(BaseModel):
+    response_text: str = Field(min_length=10)
 
 
 @router.get("")
@@ -60,8 +89,10 @@ def list_complaints(
         conditions.append("date_received <= %s")
         params.append(date_to)
     if q:
-        conditions.append("(issue ILIKE %s OR sub_issue ILIKE %s OR company ILIKE %s)")
-        params.extend([f"%{q}%"] * 3)
+        conditions.append(
+            "(issue ILIKE %s OR sub_issue ILIKE %s OR company ILIKE %s OR consumer_email ILIKE %s)"
+        )
+        params.extend([f"%{q}%"] * 4)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     offset = (page - 1) * page_size
@@ -103,6 +134,112 @@ def list_products():
     return rows
 
 
+@router.post("/extract-file")
+async def extract_complaint_file(file: UploadFile = File(...)):
+    """Extracts text, consumer email, and metadata fields from uploaded PDF, Word, Excel, or CSV."""
+    allowed_exts = (".pdf", ".docx", ".xlsx", ".xls", ".csv", ".txt")
+    filename = file.filename or "uploaded_file"
+    if not any(filename.lower().endswith(ext) for ext in allowed_exts):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Please upload a PDF, Word (.docx), Excel (.xlsx/.xls), CSV, or text file.",
+        )
+
+    try:
+        content = await file.read()
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+        if len(content) > 15 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size exceeds maximum 15MB limit.")
+
+        raw_text = extract_raw_text(filename, content)
+        if not raw_text or len(raw_text.strip()) < 10:
+            raise HTTPException(
+                status_code=422,
+                detail="Could not extract readable text from the document. Please verify the file content.",
+            )
+
+        extracted = parse_complaint_from_text(raw_text, filename)
+        return {
+            "success": True,
+            "filename": filename,
+            "extracted": extracted,
+            "character_count": len(raw_text),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Error extracting complaint document")
+        raise HTTPException(status_code=500, detail=f"Failed to process file: {str(exc)}")
+
+
+@router.post("/create")
+def create_complaint(body: CreateComplaintIn, user: dict = Depends(get_current_user)):
+    """Creates a new complaint in the database, making it immediately searchable and accessible."""
+    date_rcvd = body.date_received or date.today()
+    clean_email = (body.consumer_email or "").strip().lower() or None
+    clean_state = (body.state or "").strip().upper() or None
+    clean_zip = (body.zip_code or "").strip() or None
+
+    try:
+        with pool.connection() as conn:
+            # Generate next unique complaint_id
+            max_row = conn.execute("SELECT COALESCE(MAX(complaint_id), 10000000) AS max_id FROM complaints").fetchone()
+            new_id = int(max_row["max_id"]) + 1
+
+            insert_sql = """
+                INSERT INTO complaints (
+                    complaint_id, date_received, product, sub_product, issue, sub_issue,
+                    narrative, company, state, zip_code, submitted_via,
+                    consumer_email, timely_response, date_sent_to_company
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s
+                )
+                RETURNING *;
+            """
+            row = conn.execute(
+                insert_sql,
+                [
+                    new_id,
+                    date_rcvd,
+                    body.product.strip(),
+                    body.sub_product.strip() if body.sub_product else None,
+                    body.issue.strip(),
+                    body.sub_issue.strip() if body.sub_issue else None,
+                    body.narrative.strip(),
+                    body.company.strip(),
+                    clean_state,
+                    clean_zip,
+                    body.submitted_via,
+                    clean_email,
+                    date_rcvd,
+                ],
+            ).fetchone()
+
+            # Optional: attempt generating an embedding in background so vector similarity works immediately
+            try:
+                if body.narrative and len(body.narrative.strip()) >= 10:
+                    text_for_embed = f"{body.product} - {body.issue}: {body.narrative[:1000]}"
+                    emb = embed_query(text_for_embed)
+                    vec_str = f"[{','.join(str(v) for v in emb)}]"
+                    conn.execute(
+                        "INSERT INTO complaint_embeddings (complaint_id, embedding) "
+                        "VALUES (%s, %s::vector) ON CONFLICT (complaint_id) DO NOTHING",
+                        [new_id, vec_str],
+                    )
+            except Exception as emb_exc:
+                logger.warning(f"Embedding generation deferred for new complaint {new_id}: {emb_exc}")
+
+            return {
+                "success": True,
+                "message": f"Complaint #{new_id} recorded successfully.",
+                "complaint": row,
+            }
+    except Exception as exc:
+        logger.exception("Database error creating complaint")
+        raise HTTPException(status_code=503, detail="Failed to record complaint in database.")
+
+
 @router.get("/{complaint_id}")
 def get_complaint(complaint_id: int):
     try:
@@ -116,7 +253,8 @@ def get_complaint(complaint_id: int):
                 [complaint_id],
             ).fetchone()
             response = conn.execute(
-                "SELECT response_text, approved_by_name, approved_by_role, status, approved_at, dispatched_at "
+                "SELECT response_text, requested_by_name, requested_by_role, requested_at, "
+                "approved_by_name, approved_by_role, status, approved_at, dispatched_at "
                 "FROM complaint_responses WHERE complaint_id = %s",
                 [complaint_id],
             ).fetchone()
@@ -127,6 +265,26 @@ def get_complaint(complaint_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="Complaint not found")
     return {**row, "analysis": analysis, "response": response}
+
+
+@router.put("/{complaint_id}/email")
+def update_complaint_email(complaint_id: int, body: UpdateEmailIn):
+    """Updates or adds the consumer email address for an existing complaint."""
+    try:
+        with pool.connection() as conn:
+            row = conn.execute(
+                "UPDATE complaints SET consumer_email = %s WHERE complaint_id = %s "
+                "RETURNING complaint_id, consumer_email",
+                [body.consumer_email.lower().strip(), complaint_id],
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Complaint not found")
+            return {"success": True, "consumer_email": row["consumer_email"]}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Database error updating complaint email")
+        raise HTTPException(status_code=503, detail="Database error updating email.")
 
 
 @router.post("/{complaint_id}/analysis")
@@ -178,25 +336,19 @@ def analyze_complaint(complaint_id: int, refresh: bool = False):
                 [complaint_id, result["category"], result["summary"], model, basis],
             )
     except Exception:
-        logger.exception("Database error while saving analysis")
+        logger.exception("Database error while writing complaint analysis")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
-    return {
-        "complaint_id": complaint_id,
-        **result,
-        "model": model,
-        "basis": basis,
-        "cached": False,
-    }
+    return {"complaint_id": complaint_id, **result, "model": model, "basis": basis, "cached": False}
 
 
 @router.get("/{complaint_id}/similar")
-def get_similar_complaints(complaint_id: int, top_k: int = Query(3, ge=1, le=10)):
-    """Find similar past complaints using vector search or semantic similarity."""
+def similar_complaints(complaint_id: int, top_k: int = Query(3, ge=1, le=10)):
+    """Finds historical precedent complaints with vector cosine similarity or category match."""
     try:
         with pool.connection() as conn:
             target = conn.execute(
-                "SELECT complaint_id, product, issue, narrative FROM complaints WHERE complaint_id = %s",
+                "SELECT product, issue, narrative FROM complaints WHERE complaint_id = %s",
                 [complaint_id],
             ).fetchone()
 
@@ -224,7 +376,6 @@ def get_similar_complaints(complaint_id: int, top_k: int = Query(3, ge=1, le=10)
                 vec_str = target_emb["embedding"]
                 rows = conn.execute(sql, [vec_str, complaint_id, vec_str, top_k]).fetchall()
             else:
-                # Fallback to product & issue keyword similarity if embeddings not yet indexed
                 sql = """
                     SELECT complaint_id, date_received, product, issue, company,
                            company_response_to_consumer, narrative, 0.75 as similarity
@@ -277,32 +428,32 @@ def draft_complaint_reply(complaint_id: int, body: DraftReplyIn | None = None):
     }
 
 
-class ApproveResponseIn(BaseModel):
-    response_text: str = Field(min_length=10)
-
-
-@router.post("/{complaint_id}/approve")
-def approve_response(
+@router.post("/{complaint_id}/request-approval")
+def request_approval(
     complaint_id: int,
-    body: ApproveResponseIn,
+    body: RequestApprovalIn,
     user=Depends(get_current_user),
 ):
-    """Saves the human-approved response letter to the database audit record."""
+    """Agent action: submits a drafted response for supervisor/admin approval."""
     user_name = user.get("full_name") or user.get("email")
     user_role = user.get("role", "agent")
     user_id = user.get("id")
 
     sql = """
-        INSERT INTO complaint_responses (complaint_id, response_text, approved_by_id, approved_by_name, approved_by_role, status, approved_at)
-        VALUES (%s, %s, %s, %s, %s, 'approved', now())
+        INSERT INTO complaint_responses (
+            complaint_id, response_text, requested_by_id, requested_by_name, requested_by_role, status, requested_at
+        ) VALUES (
+            %s, %s, %s, %s, %s, 'pending_approval', now()
+        )
         ON CONFLICT (complaint_id) DO UPDATE SET
             response_text = EXCLUDED.response_text,
-            approved_by_id = EXCLUDED.approved_by_id,
-            approved_by_name = EXCLUDED.approved_by_name,
-            approved_by_role = EXCLUDED.approved_by_role,
-            status = 'approved',
-            approved_at = now()
-        RETURNING complaint_id, response_text, approved_by_name, approved_by_role, status, approved_at;
+            requested_by_id = EXCLUDED.requested_by_id,
+            requested_by_name = EXCLUDED.requested_by_name,
+            requested_by_role = EXCLUDED.requested_by_role,
+            status = 'pending_approval',
+            requested_at = now()
+        RETURNING complaint_id, response_text, requested_by_name, requested_by_role, status, requested_at,
+                  approved_by_name, approved_by_role, approved_at;
     """
 
     try:
@@ -318,10 +469,86 @@ def approve_response(
     except HTTPException:
         raise
     except Exception:
+        logger.exception("Database error while requesting approval")
+        raise HTTPException(status_code=503, detail="Database error submitting response for approval.")
+
+    return row
+
+
+@router.post("/{complaint_id}/approve")
+def approve_response(
+    complaint_id: int,
+    body: ApproveResponseIn,
+    request: Request,
+    user=Depends(get_current_user),
+):
+    """Supervisor/Admin action: Approves resolution response and notifies consumer via email."""
+    user_role = user.get("role", "agent")
+    if user_role not in ("supervisor", "admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Agents cannot approve responses directly. Please click 'Submit for Approval' to request supervisor approval.",
+        )
+
+    user_name = user.get("full_name") or user.get("email")
+    user_id = user.get("id")
+
+    sql = """
+        INSERT INTO complaint_responses (
+            complaint_id, response_text, approved_by_id, approved_by_name, approved_by_role, status, approved_at
+        )
+        VALUES (%s, %s, %s, %s, %s, 'approved', now())
+        ON CONFLICT (complaint_id) DO UPDATE SET
+            response_text = EXCLUDED.response_text,
+            approved_by_id = EXCLUDED.approved_by_id,
+            approved_by_name = EXCLUDED.approved_by_name,
+            approved_by_role = EXCLUDED.approved_by_role,
+            status = 'approved',
+            approved_at = now()
+        RETURNING complaint_id, response_text, approved_by_name, approved_by_role, status, approved_at,
+                  requested_by_name, requested_by_role, requested_at;
+    """
+
+    try:
+        with pool.connection() as conn:
+            complaint = conn.execute(
+                "SELECT complaint_id, product, issue, company, consumer_email FROM complaints WHERE complaint_id = %s",
+                [complaint_id],
+            ).fetchone()
+            if not complaint:
+                raise HTTPException(status_code=404, detail="Complaint not found")
+
+            row = conn.execute(
+                sql,
+                [complaint_id, body.response_text, user_id, user_name, user_role],
+            ).fetchone()
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("Database error while approving response")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
-    return row
+    # Send email notification to consumer if email is available
+    email_dispatched = False
+    consumer_email = (complaint.get("consumer_email") or "").strip()
+    if consumer_email:
+        client_origin = request.headers.get("origin")
+        try:
+            email_dispatched = send_complaint_approval_email(
+                consumer_email=consumer_email,
+                complaint_id=complaint_id,
+                product=complaint.get("product") or "Banking Service",
+                issue=complaint.get("issue") or "Customer Dispute",
+                company=complaint.get("company") or "Financial Institution",
+                approver_name=user_name,
+                approver_role=user_role,
+                resolution_text=body.response_text,
+                client_origin=client_origin,
+            )
+        except Exception as mail_exc:
+            logger.warning(f"Failed to dispatch approval notification email to {consumer_email}: {mail_exc}")
+
+    return {**row, "email_dispatched": email_dispatched, "consumer_email": consumer_email or None}
 
 
 @router.post("/{complaint_id}/dispatch")
@@ -342,4 +569,3 @@ def dispatch_response(complaint_id: int, user=Depends(get_current_user)):
     except Exception:
         logger.exception("Database error while dispatching response")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
-

@@ -210,3 +210,80 @@ def test_similar_complaints_search(client):
 
 
 
+
+
+def test_complaint_creation_and_approval_workflow(client):
+    from app.security import create_access_token
+    agent = get_agent_user()
+    admin = get_admin_user()
+    agent_token = create_access_token(user_id=agent["id"], role="agent")
+    admin_token = create_access_token(user_id=admin["id"], role="admin")
+
+    # 1. Agent creates complaint
+    res_create = client.post(
+        "/complaints/create",
+        headers={"Authorization": f"Bearer {agent_token}"},
+        json={
+            "product": "Credit card or prepaid card",
+            "issue": "Dispute on unauthorized fee",
+            "company": "JPMorgan Chase & Co.",
+            "consumer_email": "consumer.test@example.com",
+            "narrative": "Unauthorized monthly maintenance fee was deducted from my account without disclosure.",
+        },
+    )
+    assert res_create.status_code == 200
+    complaint_data = res_create.json()["complaint"]
+    cid = complaint_data["complaint_id"]
+    assert complaint_data["consumer_email"] == "consumer.test@example.com"
+
+    # 2. Agent submits draft for approval
+    res_req = client.post(
+        f"/complaints/{cid}/request-approval",
+        headers={"Authorization": f"Bearer {agent_token}"},
+        json={"response_text": "We have credited your account back $25 as a courtesy."},
+    )
+    assert res_req.status_code == 200
+    assert res_req.json()["status"] == "pending_approval"
+
+    # 3. Agent is forbidden from self-approving
+    res_agent_app = client.post(
+        f"/complaints/{cid}/approve",
+        headers={"Authorization": f"Bearer {agent_token}"},
+        json={"response_text": "Illegal self-approval attempt."},
+    )
+    assert res_agent_app.status_code == 403
+
+    # 4. Admin successfully approves
+    res_admin_app = client.post(
+        f"/complaints/{cid}/approve",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"response_text": "We have investigated your dispute and issued a full fee refund."},
+    )
+    assert res_admin_app.status_code == 200
+    assert res_admin_app.json()["status"] == "approved"
+    assert "email_dispatched" in res_admin_app.json()
+
+
+def test_complaint_file_extraction(client):
+    from app.security import create_access_token
+    agent = get_agent_user()
+    token = create_access_token(user_id=agent["id"], role="agent")
+    sample_text = (
+        b"DISPUTE SUBMISSION\n"
+        b"Consumer: Alice Smith\n"
+        b"Email: alice.smith@finance.org\n"
+        b"Bank: Citibank, N.A.\n"
+        b"State: TX\n"
+        b"Issue: Fraudulent ATM withdrawal\n"
+        b"Narrative: An unknown withdrawal of $200 took place at an ATM in Houston while I had my physical card."
+    )
+    res = client.post(
+        "/complaints/extract-file",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("complaint_dispute.txt", sample_text, "text/plain")},
+    )
+    assert res.status_code == 200
+    extracted = res.json()["extracted"]
+    assert extracted["consumer_email"] == "alice.smith@finance.org"
+    assert extracted["state"] == "TX"
+    assert "Checking or savings account" in extracted["product"] or "Credit card" in extracted["product"]
