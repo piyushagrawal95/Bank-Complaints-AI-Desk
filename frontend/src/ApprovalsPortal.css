@@ -426,3 +426,168 @@
   margin-left: 6px;
   box-shadow: 0 1px 4px rgba(239, 68, 68, 0.3);
 }
+
+
+/* CUSTOMER DELIVERY EMAIL INPUT */
+.delivery-email-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.delivery-email-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.delivery-email-input:focus {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
+.no-email-hint {
+  display: block;
+  font-size: 12px;
+  color: #b45309;
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.supervisor-badge {
+  color: #4338ca !important;
+  background: #e0e7ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  font-weight: 700 !important;
+}
+
+/* REJECTION PANEL */
+.btn-reject-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 18px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #be123c;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-reject-trigger:hover:not(:disabled) {
+  background: #ffe4e6;
+  border-color: #fda4af;
+  color: #9f1239;
+  transform: translateY(-1px);
+}
+
+.btn-reject-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rejection-panel {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-left: 4px solid #ea580c;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+
+.rejection-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rejection-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.rejection-panel-sub {
+  font-size: 12px;
+  color: #c2410c;
+}
+
+.rejection-reason-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #fdba74;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #7c2d12;
+  background: #ffffff;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.rejection-reason-textarea:focus {
+  outline: none;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
+}
+
+.rejection-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-cancel-rejection {
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-confirm-rejection {
+  padding: 8px 16px;
+  background: #ea580c;
+  border: none;
+  color: #ffffff;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);
+  transition: all 0.15s ease;
+}
+
+.btn-confirm-rejection:hover:not(:disabled) {
+  background: #c2410c;
+  transform: translateY(-1px);
+}
+
+.btn-confirm-rejection:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

@@ -3,6 +3,8 @@ import {
   approveRoleUpgrade,
   getPendingRoleUpgrades,
   getUsers,
+  getSupervisors,
+  assignAgentSupervisor,
   rejectRoleUpgrade,
   updateUserRole,
 } from "./api";
@@ -17,11 +19,13 @@ function isSuperAdminUser(email) {
 
 function UserManagement({ currentUser }) {
   const [users, setUsers] = useState([]);
+  const [supervisors, setSupervisors] = useState([]);
   const [pendingUpgrades, setPendingUpgrades] = useState([]);
   const [processingUpgradeId, setProcessingUpgradeId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [assigningId, setAssigningId] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
   useEffect(() => {
@@ -39,9 +43,10 @@ function UserManagement({ currentUser }) {
     setLoading(true);
     setError(null);
     try {
-      const [usersData, pendingData] = await Promise.all([
+      const [usersData, pendingData, supData] = await Promise.all([
         getUsers(),
         getPendingRoleUpgrades().catch(() => []),
+        getSupervisors().catch(() => []),
       ]);
       const normalized = (usersData || []).map((u) => {
         if (isSuperAdminUser(u.email)) {
@@ -51,6 +56,7 @@ function UserManagement({ currentUser }) {
       });
       setUsers(normalized);
       setPendingUpgrades(pendingData || []);
+      setSupervisors(supData || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -69,6 +75,8 @@ function UserManagement({ currentUser }) {
       setUsers((prev) =>
         prev.map((u) => (u.id === targetUserId ? { ...u, role: newRole } : u))
       );
+      // Reload supervisors in case someone was promoted to supervisor
+      getSupervisors().then(setSupervisors).catch(() => {});
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err) {
       setError(err.message || "Failed to approve role upgrade.");
@@ -101,21 +109,58 @@ function UserManagement({ currentUser }) {
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
       );
-      setSuccessMsg(`Successfully updated role to ${newRole.toUpperCase()}!`);
-      setTimeout(() => setSuccessMsg(null), 3000);
+      setSuccessMsg(`User role successfully changed to ${newRole.toUpperCase()}`);
+      getSupervisors().then(setSupervisors).catch(() => {});
+      setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Failed to change user role.");
     } finally {
       setUpdatingId(null);
     }
   }
 
-  const roleStats = {
-    total: users.length,
-    agents: users.filter((u) => u.role === "agent").length,
-    supervisors: users.filter((u) => u.role === "supervisor").length,
-    admins: users.filter((u) => u.role === "admin").length,
-  };
+  async function handleAssignSupervisor(agentId, supervisorId) {
+    setAssigningId(agentId);
+    setError(null);
+    setSuccessMsg(null);
+    const supId = supervisorId ? parseInt(supervisorId, 10) : null;
+    try {
+      const res = await assignAgentSupervisor(agentId, supId);
+      setSuccessMsg(res.message);
+      setUsers((prev) =>
+        prev.map((u) => {
+          if (u.id === agentId) {
+            const assignedSup = supervisors.find((s) => s.id === supId);
+            return {
+              ...u,
+              supervisor_id: supId,
+              supervisor_name: assignedSup ? assignedSup.full_name : null,
+              supervisor_email: assignedSup ? assignedSup.email : null,
+            };
+          }
+          return u;
+        })
+      );
+      // Refresh supervisor capacities
+      getSupervisors().then(setSupervisors).catch(() => {});
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err) {
+      setError(err.message || "Failed to assign supervisor.");
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
+  const roleStats = users.reduce(
+    (acc, u) => {
+      acc.total += 1;
+      if (u.role === "agent") acc.agents += 1;
+      else if (u.role === "supervisor") acc.supervisors += 1;
+      else if (u.role === "admin") acc.admins += 1;
+      return acc;
+    },
+    { total: 0, agents: 0, supervisors: 0, admins: 0 }
+  );
 
   return (
     <div className="users-container">
@@ -123,7 +168,7 @@ function UserManagement({ currentUser }) {
         <div>
           <h2>User Role & Access Management</h2>
           <p className="users-subtitle">
-            Admin Portal: Manage user permissions, assign operational roles, and enforce security policies.
+            Admin Portal: Manage user permissions, enforce max 50 agents per supervisor hierarchy, and review promotions.
           </p>
         </div>
         <button className="secondary refresh-btn" onClick={loadUsers} disabled={loading}>
@@ -201,8 +246,47 @@ function UserManagement({ currentUser }) {
         </div>
       </div>
 
+      {/* SUPERVISOR CAPACITY OVERVIEW WIDGET */}
+      {supervisors.length > 0 && (
+        <div className="supervisor-capacity-section">
+          <div className="capacity-section-head">
+            <h3>Supervisor Team Capacity (Max 50 Agents per Supervisor)</h3>
+            <span className="capacity-subtitle">
+              Approval requests from agents are automatically routed to their assigned supervisor.
+            </span>
+          </div>
+          <div className="supervisor-capacity-grid">
+            {supervisors.map((s) => {
+              const count = parseInt(s.assigned_agent_count || 0, 10);
+              const pct = Math.min(100, Math.round((count / 50) * 100));
+              const isFull = count >= 50;
+              return (
+                <div key={s.id} className={`sup-capacity-card ${isFull ? "sup-card-full" : ""}`}>
+                  <div className="sup-card-head">
+                    <span className="sup-name">{s.full_name || s.email}</span>
+                    <span className={`sup-capacity-pill ${isFull ? "pill-full" : "pill-available"}`}>
+                      {isFull ? "FULL (50/50)" : `${count} / 50 Agents`}
+                    </span>
+                  </div>
+                  <div className="sup-progress-bar-bg">
+                    <div
+                      className={`sup-progress-bar-fill ${isFull ? "fill-full" : ""}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="sup-card-foot">
+                    <span>{50 - count} seats available</span>
+                    <span className="sup-email-small">{s.email}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {successMsg && <div className="toast-success">{successMsg}</div>}
-      {error && <div className="error">Error loading user directory: {error}</div>}
+      {error && <div className="error">Error: {error}</div>}
 
       {loading && <p className="info">Loading users...</p>}
 
@@ -214,6 +298,7 @@ function UserManagement({ currentUser }) {
                 <th>Name</th>
                 <th>Email Address</th>
                 <th>Current Role</th>
+                <th>Assigned Supervisor</th>
                 <th>Status</th>
                 <th>Change Role</th>
               </tr>
@@ -222,6 +307,9 @@ function UserManagement({ currentUser }) {
               {users.map((u) => {
                 const isCurrent = currentUser && currentUser.id === u.id;
                 const userPendingReq = pendingUpgrades.find((r) => r.user_id === u.id);
+                const isAgent = u.role === "agent";
+                const isSupervisor = u.role === "supervisor";
+
                 return (
                   <tr key={u.id} className={isCurrent ? "current-user-row" : ""}>
                     <td>
@@ -244,9 +332,48 @@ function UserManagement({ currentUser }) {
                         </span>
                       )}
                     </td>
+
+                    {/* ASSIGNED SUPERVISOR COLUMN */}
+                    <td>
+                      {isAgent ? (
+                        <div className="supervisor-assign-wrapper">
+                          <select
+                            className="supervisor-select"
+                            value={u.supervisor_id || ""}
+                            disabled={assigningId === u.id}
+                            onChange={(e) => handleAssignSupervisor(u.id, e.target.value)}
+                          >
+                            <option value="">(Unassigned / General Queue)</option>
+                            {supervisors.map((s) => {
+                              const count = parseInt(s.assigned_agent_count || 0, 10);
+                              const isSelfAssigned = u.supervisor_id === s.id;
+                              const isFull = count >= 50 && !isSelfAssigned;
+                              return (
+                                <option
+                                  key={s.id}
+                                  value={s.id}
+                                  disabled={isFull}
+                                >
+                                  {s.full_name || s.email} ({count}/50){isFull ? " - FULL" : ""}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          {assigningId === u.id && <span className="updating-spinner">...</span>}
+                        </div>
+                      ) : isSupervisor ? (
+                        <span className="supervisor-lead-tag">
+                          Team Lead ({supervisors.find((s) => s.id === u.id)?.assigned_agent_count || 0}/50)
+                        </span>
+                      ) : (
+                        <span className="admin-tag">-</span>
+                      )}
+                    </td>
+
                     <td>
                       <span className="status-pill active-pill">Active</span>
                     </td>
+
                     <td>
                       {isSuperAdminUser(u.email) ? (
                         <span className="super-admin-lock-tag" title="Root Super Admin (Role is permanently locked)">

@@ -2,13 +2,13 @@ import logging
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, EmailStr, Field
 
 from app.core.config import settings
 from app.db import pool
 from app.deps import get_current_user
-from app.email_service import send_complaint_approval_email, send_supervisor_approval_request_email
+from app.email_service import send_complaint_approval_email, send_supervisor_approval_request_email, send_agent_rejection_notification_email
 from app.file_extractor import extract_raw_text, parse_complaint_from_text, extract_complaints_from_file
 from app.llm.analysis import (
     BASIS_METADATA,
@@ -57,6 +57,11 @@ class RequestApprovalIn(BaseModel):
 
 class ApproveResponseIn(BaseModel):
     response_text: str = Field(min_length=10)
+    consumer_email: str | None = None
+
+
+class RejectResponseIn(BaseModel):
+    reason: str = Field(min_length=3, max_length=1500)
 
 
 @router.get("")
@@ -238,21 +243,54 @@ def create_complaint(body: CreateComplaintIn, user: dict = Depends(get_current_u
 
 @router.get("/pending-approvals")
 def list_pending_approvals(user=Depends(get_current_user)):
-    """Lists all complaints with draft responses currently awaiting supervisor approval."""
-    sql = """
-        SELECT 
-            c.complaint_id, c.date_received, c.product, c.issue, c.company,
-            c.state, c.consumer_email, c.narrative,
-            cr.response_text, cr.requested_by_name, cr.requested_by_role,
-            cr.requested_at, cr.status, cr.assigned_to_name, cr.assigned_to_email
-        FROM complaints c
-        JOIN complaint_responses cr ON c.complaint_id = cr.complaint_id
-        WHERE cr.status = 'pending_approval'
-        ORDER BY cr.requested_at DESC NULLS LAST;
+    """Lists all complaints with draft responses currently awaiting approval.
+    Supervisors see their assigned agents' requests (+ unassigned); Admins see all.
     """
+    user_role = user.get("role", "agent")
+    user_id = user.get("id")
+    user_email = (user.get("email") or "").lower()
+    super_admin_email = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+    is_admin = user_role == "admin" or user_email == super_admin_email
+
+    if is_admin:
+        sql = """
+            SELECT 
+                c.complaint_id, c.date_received, c.product, c.issue, c.company,
+                c.state, c.consumer_email, c.narrative,
+                cr.response_text, cr.requested_by_id, cr.requested_by_name, cr.requested_by_role,
+                cr.requested_at, cr.status, cr.assigned_to_id, cr.assigned_to_name, cr.assigned_to_email,
+                cr.rejection_reason, cr.rejected_by_name, cr.rejected_at
+            FROM complaints c
+            JOIN complaint_responses cr ON c.complaint_id = cr.complaint_id
+            WHERE cr.status = 'pending_approval'
+            ORDER BY cr.requested_at DESC NULLS LAST;
+        """
+        params = []
+    else:
+        # Supervisor sees complaints assigned to them, or requested by agents assigned to them, or unassigned
+        sql = """
+            SELECT 
+                c.complaint_id, c.date_received, c.product, c.issue, c.company,
+                c.state, c.consumer_email, c.narrative,
+                cr.response_text, cr.requested_by_id, cr.requested_by_name, cr.requested_by_role,
+                cr.requested_at, cr.status, cr.assigned_to_id, cr.assigned_to_name, cr.assigned_to_email,
+                cr.rejection_reason, cr.rejected_by_name, cr.rejected_at
+            FROM complaints c
+            JOIN complaint_responses cr ON c.complaint_id = cr.complaint_id
+            LEFT JOIN users u_agent ON cr.requested_by_id = u_agent.id
+            WHERE cr.status = 'pending_approval'
+              AND (
+                  cr.assigned_to_id = %s 
+                  OR u_agent.supervisor_id = %s 
+                  OR (cr.assigned_to_id IS NULL AND u_agent.supervisor_id IS NULL)
+              )
+            ORDER BY cr.requested_at DESC NULLS LAST;
+        """
+        params = [user_id, user_id]
+
     try:
         with pool.connection() as conn:
-            rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql, params).fetchall()
         return {"count": len(rows), "items": rows}
     except Exception as exc:
         logger.exception("Error fetching pending approvals")
@@ -273,7 +311,9 @@ def get_complaint(complaint_id: int):
             ).fetchone()
             response = conn.execute(
                 "SELECT response_text, requested_by_name, requested_by_role, requested_at, "
-                "approved_by_name, approved_by_role, status, approved_at, dispatched_at "
+                "approved_by_name, approved_by_role, status, approved_at, "
+                "rejection_reason, rejected_by_name, rejected_at, "
+                "dispatched_at, email_dispatch_status, dispatched_to_email "
                 "FROM complaint_responses WHERE complaint_id = %s",
                 [complaint_id],
             ).fetchone()
@@ -289,12 +329,89 @@ def get_complaint(complaint_id: int):
 
 
 
+
+def generate_batch_embeddings_task(complaints_data: list[dict]):
+    """Background task: generates and saves vector embeddings for batch-created complaints."""
+    from app.llm.embedding import embed_query
+    for item in complaints_data:
+        cid = item.get("complaint_id")
+        narrative = item.get("narrative") or ""
+        issue = item.get("issue") or ""
+        product = item.get("product") or ""
+        embed_text = f"{product} - {issue}: {narrative}".strip()
+        if not embed_text:
+            continue
+        try:
+            vec = embed_query(embed_text)
+            if vec:
+                with pool.connection() as conn:
+                    conn.execute(
+                        """
+                        INSERT INTO complaint_embeddings (complaint_id, embedding)
+                        VALUES (%s, %s)
+                        ON CONFLICT (complaint_id) DO UPDATE SET embedding = EXCLUDED.embedding
+                        """,
+                        [cid, str(vec)]
+                    )
+        except Exception as exc:
+            logger.warning(f"Could not generate background embedding for complaint {cid}: {exc}")
+
+
+def dispatch_approval_email_task(
+    complaint_id: int,
+    consumer_email: str,
+    product: str,
+    issue: str,
+    company: str,
+    approver_name: str,
+    approver_role: str,
+    resolution_text: str,
+    client_origin: str | None,
+):
+    """Background task: dispatches resolution email to consumer and updates dispatched_at timestamp."""
+    success = False
+    try:
+        success = send_complaint_approval_email(
+            consumer_email=consumer_email,
+            complaint_id=complaint_id,
+            product=product,
+            issue=issue,
+            company=company,
+            approver_name=approver_name,
+            approver_role=approver_role,
+            resolution_text=resolution_text,
+            client_origin=client_origin,
+        )
+    except Exception as mail_exc:
+        logger.warning(f"Failed to dispatch approval notification email to {consumer_email}: {mail_exc}")
+
+    status_str = "sent" if success else "failed"
+    try:
+        with pool.connection() as conn:
+            conn.execute(
+                """
+                UPDATE complaint_responses
+                SET dispatched_at = now(),
+                    email_dispatch_status = %s,
+                    dispatched_to_email = %s
+                WHERE complaint_id = %s
+                """,
+                [status_str, consumer_email, complaint_id]
+            )
+    except Exception as exc:
+        logger.exception(f"Failed to record dispatched_at for complaint {complaint_id}: {exc}")
+
+
 class BatchCreateIn(BaseModel):
     complaints: list[CreateComplaintIn]
 
 
 @router.post("/batch-create")
-def batch_create_complaints(body: BatchCreateIn, user: dict = Depends(get_current_user)):
+def batch_create_complaints(
+    body: BatchCreateIn,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user),
+):
     """Inserts multiple complaints into the database in a single batch operation."""
     if not body.complaints:
         raise HTTPException(status_code=400, detail="No complaints provided for batch creation.")
@@ -348,6 +465,19 @@ def batch_create_complaints(body: BatchCreateIn, user: dict = Depends(get_curren
                 ).fetchone()
                 created_list.append(row)
             conn.commit()
+
+            # Schedule background generation of vector embeddings for all batch complaints
+            background_items = [
+                {
+                    "complaint_id": r["complaint_id"],
+                    "product": r["product"],
+                    "issue": r["issue"],
+                    "narrative": item.narrative or "",
+                }
+                for r, item in zip(created_list, body.complaints)
+            ]
+            background_tasks.add_task(generate_batch_embeddings_task, background_items)
+
         return {"success": True, "count": len(created_list), "complaints": created_list}
     except Exception as exc:
         logger.exception("Error in batch complaint creation")
@@ -520,29 +650,13 @@ def request_approval(
     complaint_id: int,
     body: RequestApprovalIn,
     request: Request,
+    background_tasks: BackgroundTasks,
     user=Depends(get_current_user),
 ):
-    """Agent action: submits a drafted response for supervisor/admin approval and notifies supervisors."""
+    """Agent action: submits drafted response for assigned supervisor approval and notifies supervisor."""
     user_name = user.get("full_name") or user.get("email")
     user_role = user.get("role", "agent")
     user_id = user.get("id")
-
-    sql = """
-        INSERT INTO complaint_responses (
-            complaint_id, response_text, requested_by_id, requested_by_name, requested_by_role, status, requested_at
-        ) VALUES (
-            %s, %s, %s, %s, %s, 'pending_approval', now()
-        )
-        ON CONFLICT (complaint_id) DO UPDATE SET
-            response_text = EXCLUDED.response_text,
-            requested_by_id = EXCLUDED.requested_by_id,
-            requested_by_name = EXCLUDED.requested_by_name,
-            requested_by_role = EXCLUDED.requested_by_role,
-            status = 'pending_approval',
-            requested_at = now()
-        RETURNING complaint_id, response_text, requested_by_name, requested_by_role, status, requested_at,
-                  approved_by_name, approved_by_role, approved_at;
-    """
 
     try:
         with pool.connection() as conn:
@@ -553,39 +667,157 @@ def request_approval(
             if not complaint:
                 raise HTTPException(status_code=404, detail="Complaint not found")
 
+            # Check if this agent is assigned to a specific supervisor
+            agent_user = conn.execute("SELECT supervisor_id FROM users WHERE id = %s", [user_id]).fetchone()
+            supervisor_id = agent_user["supervisor_id"] if agent_user else None
+
+            assigned_sup = None
+            if supervisor_id:
+                assigned_sup = conn.execute(
+                    "SELECT id, email, full_name FROM users WHERE id = %s AND is_active = true",
+                    [supervisor_id]
+                ).fetchone()
+
+            if assigned_sup:
+                assigned_id = assigned_sup["id"]
+                assigned_name = assigned_sup["full_name"]
+                assigned_email = assigned_sup["email"]
+                supervisors_to_notify = [assigned_sup]
+            else:
+                assigned_id = None
+                assigned_name = None
+                assigned_email = None
+                supervisors_to_notify = conn.execute(
+                    "SELECT id, email, full_name FROM users WHERE role IN ('supervisor', 'admin') AND is_active = true"
+                ).fetchall()
+
+            sql = """
+                INSERT INTO complaint_responses (
+                    complaint_id, response_text, requested_by_id, requested_by_name, requested_by_role, status, requested_at,
+                    assigned_to_id, assigned_to_name, assigned_to_email,
+                    rejection_reason, rejected_by_id, rejected_by_name, rejected_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, 'pending_approval', now(),
+                    %s, %s, %s,
+                    NULL, NULL, NULL, NULL
+                )
+                ON CONFLICT (complaint_id) DO UPDATE SET
+                    response_text = EXCLUDED.response_text,
+                    requested_by_id = EXCLUDED.requested_by_id,
+                    requested_by_name = EXCLUDED.requested_by_name,
+                    requested_by_role = EXCLUDED.requested_by_role,
+                    assigned_to_id = EXCLUDED.assigned_to_id,
+                    assigned_to_name = EXCLUDED.assigned_to_name,
+                    assigned_to_email = EXCLUDED.assigned_to_email,
+                    status = 'pending_approval',
+                    requested_at = now(),
+                    rejection_reason = NULL,
+                    rejected_by_id = NULL,
+                    rejected_by_name = NULL,
+                    rejected_at = NULL
+                RETURNING complaint_id, response_text, requested_by_name, requested_by_role, status, requested_at,
+                          assigned_to_name, assigned_to_email, approved_by_name, approved_by_role, approved_at;
+            """
+
             row = conn.execute(
                 sql,
-                [complaint_id, body.response_text, user_id, user_name, user_role],
+                [complaint_id, body.response_text, user_id, user_name, user_role, assigned_id, assigned_name, assigned_email],
             ).fetchone()
-
-            supervisors = conn.execute(
-                "SELECT email, full_name FROM users WHERE role IN ('supervisor', 'admin') AND is_active = true"
-            ).fetchall()
     except HTTPException:
         raise
     except Exception:
         logger.exception("Database error while requesting approval")
         raise HTTPException(status_code=503, detail="Database error submitting response for approval.")
 
-    # Dispatch email notification to all active supervisors
+    # Dispatch email notifications in background task without blocking the response
     client_origin = request.headers.get("origin")
-    for sup in supervisors:
-        try:
-            send_supervisor_approval_request_email(
-                to_email=sup["email"],
-                supervisor_name=sup["full_name"],
-                complaint_id=complaint_id,
-                company=complaint.get("company") or "Bank",
-                product=complaint.get("product") or "Service",
-                issue=complaint.get("issue") or "Customer Dispute",
-                agent_name=user_name,
-                response_draft=body.response_text,
-                client_origin=client_origin,
-            )
-        except Exception as mail_err:
-            logger.warning(f"Could not notify supervisor {sup['email']}: {mail_err}")
+    for sup in supervisors_to_notify:
+        background_tasks.add_task(
+            send_supervisor_approval_request_email,
+            to_email=sup["email"],
+            supervisor_name=sup["full_name"],
+            complaint_id=complaint_id,
+            company=complaint.get("company") or "Bank",
+            product=complaint.get("product") or "Service",
+            issue=complaint.get("issue") or "Customer Dispute",
+            agent_name=user_name,
+            response_draft=body.response_text,
+            client_origin=client_origin,
+        )
 
     return row
+
+
+@router.post("/{complaint_id}/reject")
+def reject_response(
+    complaint_id: int,
+    body: RejectResponseIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user=Depends(get_current_user),
+):
+    """Supervisor/Admin action: Rejects resolution draft with feedback notes sent back to agent."""
+    user_role = user.get("role", "agent")
+    user_email = (user.get("email") or "").lower()
+    super_admin_email = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+    is_admin = user_role == "admin" or user_email == super_admin_email
+    if not (is_admin or user_role == "supervisor"):
+        raise HTTPException(status_code=403, detail="Access denied: Only supervisors or admins can reject draft responses.")
+
+    user_name = user.get("full_name") or user.get("email")
+    user_id = user.get("id")
+
+    sql = """
+        UPDATE complaint_responses
+        SET status = 'rejected',
+            rejection_reason = %s,
+            rejected_by_id = %s,
+            rejected_by_name = %s,
+            rejected_at = now()
+        WHERE complaint_id = %s
+        RETURNING complaint_id, status, rejection_reason, rejected_by_name, rejected_at, requested_by_id;
+    """
+    try:
+        with pool.connection() as conn:
+            row = conn.execute(sql, [body.reason, user_id, user_name, complaint_id]).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Complaint response record not found.")
+
+            complaint = conn.execute(
+                "SELECT company, product, issue FROM complaints WHERE complaint_id = %s",
+                [complaint_id]
+            ).fetchone()
+
+            agent = None
+            if row.get("requested_by_id"):
+                agent = conn.execute(
+                    "SELECT email, full_name FROM users WHERE id = %s",
+                    [row["requested_by_id"]]
+                ).fetchone()
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Database error while rejecting draft response")
+        raise HTTPException(status_code=503, detail="Database error while saving rejection.")
+
+    # Dispatch rejection notification email to agent in background
+    if agent and agent.get("email"):
+        background_tasks.add_task(
+            send_agent_rejection_notification_email,
+            to_email=agent["email"],
+            agent_name=agent.get("full_name") or "Agent",
+            complaint_id=complaint_id,
+            company=complaint.get("company") if complaint else "Bank",
+            supervisor_name=user_name,
+            reason=body.reason,
+            client_origin=request.headers.get("origin"),
+        )
+
+    return {
+        "success": True,
+        "message": f"Complaint #{complaint_id} draft rejected. Feedback sent to agent.",
+        **row,
+    }
 
 
 @router.post("/{complaint_id}/approve")
@@ -593,34 +825,22 @@ def approve_response(
     complaint_id: int,
     body: ApproveResponseIn,
     request: Request,
+    background_tasks: BackgroundTasks,
     user=Depends(get_current_user),
 ):
-    """Supervisor/Admin action: Approves resolution response and notifies consumer via email."""
+    """Supervisor/Admin action: Approves resolution response and asynchronously dispatches email to consumer."""
     user_role = user.get("role", "agent")
-    if user_role not in ("supervisor", "admin"):
+    user_email = (user.get("email") or "").lower()
+    super_admin_email = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+    is_admin = user_role == "admin" or user_email == super_admin_email
+    if not (is_admin or user_role == "supervisor"):
         raise HTTPException(
             status_code=403,
-            detail="Access denied: Agents cannot approve responses directly. Please click 'Submit for Approval' to request supervisor approval.",
+            detail="Access denied: Agents cannot approve responses directly. Please click 'Submit for Approval'.",
         )
 
     user_name = user.get("full_name") or user.get("email")
     user_id = user.get("id")
-
-    sql = """
-        INSERT INTO complaint_responses (
-            complaint_id, response_text, approved_by_id, approved_by_name, approved_by_role, status, approved_at
-        )
-        VALUES (%s, %s, %s, %s, %s, 'approved', now())
-        ON CONFLICT (complaint_id) DO UPDATE SET
-            response_text = EXCLUDED.response_text,
-            approved_by_id = EXCLUDED.approved_by_id,
-            approved_by_name = EXCLUDED.approved_by_name,
-            approved_by_role = EXCLUDED.approved_by_role,
-            status = 'approved',
-            approved_at = now()
-        RETURNING complaint_id, response_text, approved_by_name, approved_by_role, status, approved_at,
-                  requested_by_name, requested_by_role, requested_at;
-    """
 
     try:
         with pool.connection() as conn:
@@ -630,6 +850,35 @@ def approve_response(
             ).fetchone()
             if not complaint:
                 raise HTTPException(status_code=404, detail="Complaint not found")
+
+            # If supervisor provided or updated the consumer email, update complaints table
+            target_email = (body.consumer_email or "").strip().lower() if body.consumer_email else (complaint.get("consumer_email") or "").strip().lower()
+            if body.consumer_email and body.consumer_email != complaint.get("consumer_email"):
+                conn.execute(
+                    "UPDATE complaints SET consumer_email = %s WHERE complaint_id = %s",
+                    [target_email, complaint_id]
+                )
+
+            sql = """
+                INSERT INTO complaint_responses (
+                    complaint_id, response_text, approved_by_id, approved_by_name, approved_by_role, status, approved_at,
+                    rejection_reason, rejected_by_id, rejected_by_name, rejected_at
+                )
+                VALUES (%s, %s, %s, %s, %s, 'approved', now(), NULL, NULL, NULL, NULL)
+                ON CONFLICT (complaint_id) DO UPDATE SET
+                    response_text = EXCLUDED.response_text,
+                    approved_by_id = EXCLUDED.approved_by_id,
+                    approved_by_name = EXCLUDED.approved_by_name,
+                    approved_by_role = EXCLUDED.approved_by_role,
+                    status = 'approved',
+                    approved_at = now(),
+                    rejection_reason = NULL,
+                    rejected_by_id = NULL,
+                    rejected_by_name = NULL,
+                    rejected_at = NULL
+                RETURNING complaint_id, response_text, approved_by_name, approved_by_role, status, approved_at,
+                          requested_by_name, requested_by_role, requested_at;
+            """
 
             row = conn.execute(
                 sql,
@@ -641,27 +890,38 @@ def approve_response(
         logger.exception("Database error while approving response")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
-    # Send email notification to consumer if email is available
-    email_dispatched = False
-    consumer_email = (complaint.get("consumer_email") or "").strip()
-    if consumer_email:
-        client_origin = request.headers.get("origin")
+    # Schedule background dispatch of resolution email so supervisor response is instant (<100ms)
+    client_origin = request.headers.get("origin")
+    if target_email:
+        background_tasks.add_task(
+            dispatch_approval_email_task,
+            complaint_id=complaint_id,
+            consumer_email=target_email,
+            product=complaint.get("product") or "Banking Service",
+            issue=complaint.get("issue") or "Customer Dispute",
+            company=complaint.get("company") or "Financial Institution",
+            approver_name=user_name,
+            approver_role=user_role,
+            resolution_text=body.response_text,
+            client_origin=client_origin,
+        )
+    else:
+        # Mark as no email available
         try:
-            email_dispatched = send_complaint_approval_email(
-                consumer_email=consumer_email,
-                complaint_id=complaint_id,
-                product=complaint.get("product") or "Banking Service",
-                issue=complaint.get("issue") or "Customer Dispute",
-                company=complaint.get("company") or "Financial Institution",
-                approver_name=user_name,
-                approver_role=user_role,
-                resolution_text=body.response_text,
-                client_origin=client_origin,
-            )
-        except Exception as mail_exc:
-            logger.warning(f"Failed to dispatch approval notification email to {consumer_email}: {mail_exc}")
+            with pool.connection() as conn:
+                conn.execute(
+                    "UPDATE complaint_responses SET email_dispatch_status = 'no_email' WHERE complaint_id = %s",
+                    [complaint_id]
+                )
+        except Exception:
+            pass
 
-    return {**row, "email_dispatched": email_dispatched, "consumer_email": consumer_email or None}
+    return {
+        **row,
+        "email_dispatched": bool(target_email),
+        "consumer_email": target_email or None,
+        "message": f"Complaint #{complaint_id} approved successfully." + (f" Official notice queued for {target_email}." if target_email else " (No customer email provided).")
+    }
 
 
 @router.post("/{complaint_id}/dispatch")

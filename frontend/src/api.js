@@ -135,8 +135,26 @@ export const draftReply = (id, instructions = "") =>
   request(`/complaints/${id}/draft-reply`, { method: "POST", body: { custom_instructions: instructions } });
 export const requestComplaintApproval = (id, response_text) =>
   request(`/complaints/${id}/request-approval`, { method: "POST", body: { response_text } });
-export const approveComplaintResponse = (id, response_text) =>
-  request(`/complaints/${id}/approve`, { method: "POST", body: { response_text } });
+export const approveComplaintResponse = (id, response_text, consumer_email = null) =>
+  request(`/complaints/${id}/approve`, {
+    method: "POST",
+    body: { response_text, consumer_email: consumer_email || null },
+  });
+
+export const rejectComplaintResponse = (id, reason) =>
+  request(`/complaints/${id}/reject`, {
+    method: "POST",
+    body: { reason },
+  });
+
+export const getSupervisors = () =>
+  request("/auth/supervisors");
+
+export const assignAgentSupervisor = (agent_id, supervisor_id) =>
+  request("/auth/users/supervisor", {
+    method: "PUT",
+    body: { agent_id, supervisor_id: supervisor_id || null },
+  });
 export const getPendingApprovals = () =>
   request("/complaints/pending-approvals");
 export const updateComplaintEmail = (id, consumer_email) =>

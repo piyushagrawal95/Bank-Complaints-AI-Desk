@@ -371,3 +371,166 @@
   50% { opacity: 0.65; }
 }
 
+
+
+/* =========================================
+   SUPERVISOR CAPACITY OVERVIEW & ASSIGNMENT
+   ========================================= */
+.supervisor-capacity-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.capacity-section-head {
+  margin-bottom: 1rem;
+}
+
+.capacity-section-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.capacity-subtitle {
+  font-size: 0.82rem;
+  color: #64748b;
+  display: block;
+  margin-top: 3px;
+}
+
+.supervisor-capacity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.sup-capacity-card {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 1rem 1.15rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: all 0.15s ease;
+}
+
+.sup-capacity-card:hover {
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+}
+
+.sup-capacity-card.sup-card-full {
+  border-color: #fca5a5;
+  background: #fff5f5;
+}
+
+.sup-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sup-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #0f172a;
+}
+
+.sup-capacity-pill {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+}
+
+.pill-available {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.pill-full {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+.sup-progress-bar-bg {
+  width: 100%;
+  height: 7px;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.sup-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.sup-progress-bar-fill.fill-full {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.sup-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.sup-email-small {
+  color: #94a3b8;
+  font-size: 0.74rem;
+}
+
+/* SUPERVISOR ASSIGN DROPDOWN IN TABLE */
+.supervisor-assign-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.supervisor-select {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+  font-family: inherit;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1e293b;
+  cursor: pointer;
+  max-width: 220px;
+}
+
+.supervisor-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.supervisor-lead-tag {
+  display: inline-block;
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}
+
+.admin-tag {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}

@@ -14,7 +14,14 @@ CREATE TABLE IF NOT EXISTS complaint_responses (
     approved_by_role TEXT,
     status TEXT NOT NULL DEFAULT 'draft',
     approved_at TIMESTAMPTZ,
-    dispatched_at TIMESTAMPTZ
+    rejection_reason TEXT,
+    rejected_by_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    rejected_by_name TEXT,
+    rejected_at TIMESTAMPTZ,
+    dispatched_at TIMESTAMPTZ,
+    email_dispatch_status TEXT,
+    dispatched_to_email TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_complaint_responses_status ON complaint_responses (status);
+CREATE INDEX IF NOT EXISTS idx_complaint_responses_assigned ON complaint_responses (assigned_to_id);

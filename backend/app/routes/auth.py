@@ -131,13 +131,30 @@ def signup(body: SignupIn, request: Request):
     is_super = (email == super_admin or email == "piyushagrawal300504@gmail.com")
     init_role = "admin" if is_super else "agent"
     init_active = True if is_super else False
+    supervisor_id = None
     try:
         with pool.connection() as conn:
+            if init_role == "agent":
+                sup_row = conn.execute(
+                    """
+                    SELECT s.id
+                    FROM users s
+                    LEFT JOIN users a ON a.supervisor_id = s.id AND a.role = 'agent' AND a.is_active = true
+                    WHERE s.role = 'supervisor' AND s.is_active = true
+                    GROUP BY s.id
+                    HAVING COUNT(a.id) < 50
+                    ORDER BY COUNT(a.id) ASC, s.id ASC
+                    LIMIT 1;
+                    """
+                ).fetchone()
+                if sup_row:
+                    supervisor_id = sup_row["id"]
+
             row = conn.execute(
-                "INSERT INTO users (email, password_hash, full_name, role, is_active) "
-                "VALUES (%s, %s, %s, %s, %s) ON CONFLICT (email) DO NOTHING "
-                "RETURNING id, email, full_name, role, is_active",
-                [email, hash_password(body.password), body.full_name, init_role, init_active],
+                "INSERT INTO users (email, password_hash, full_name, role, is_active, supervisor_id) "
+                "VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (email) DO NOTHING "
+                "RETURNING id, email, full_name, role, is_active, supervisor_id",
+                [email, hash_password(body.password), body.full_name, init_role, init_active, supervisor_id],
             ).fetchone()
     except Exception as exc:
         logger.exception("Database error during signup")
@@ -690,8 +707,13 @@ def list_users(admin=Depends(require_role("admin"))):
     try:
         with pool.connection() as conn:
             rows = conn.execute(
-                "SELECT id, email, full_name, role, is_active, created_at "
-                "FROM users ORDER BY id"
+                """
+                SELECT u.id, u.email, u.full_name, u.role, u.is_active, u.created_at, u.supervisor_id,
+                       s.full_name AS supervisor_name, s.email AS supervisor_email
+                FROM users u
+                LEFT JOIN users s ON u.supervisor_id = s.id
+                ORDER BY u.id
+                """
             ).fetchall()
             super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
             for r in rows:
@@ -702,6 +724,74 @@ def list_users(admin=Depends(require_role("admin"))):
     except Exception as exc:
         logger.exception("Database error while listing users")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
+
+
+class AssignSupervisorIn(BaseModel):
+    agent_id: int
+    supervisor_id: int | None = None
+
+
+@router.get("/supervisors")
+def list_supervisors(user=Depends(get_current_user)):
+    """Returns active supervisors with their assigned agent counts and capacity limits (max 50)."""
+    sql = """
+        SELECT s.id, s.full_name, s.email, COUNT(a.id) AS assigned_agent_count,
+               50 AS max_capacity, (50 - COUNT(a.id)) AS available_slots
+        FROM users s
+        LEFT JOIN users a ON a.supervisor_id = s.id AND a.role = 'agent' AND a.is_active = true
+        WHERE s.role = 'supervisor' AND s.is_active = true
+        GROUP BY s.id, s.full_name, s.email
+        ORDER BY s.full_name ASC;
+    """
+    try:
+        with pool.connection() as conn:
+            return conn.execute(sql).fetchall()
+    except Exception as exc:
+        logger.exception("Database error while listing supervisors")
+        raise HTTPException(status_code=500, detail="Failed to fetch supervisors")
+
+
+@router.put("/users/supervisor")
+def assign_agent_supervisor(body: AssignSupervisorIn, admin=Depends(require_role("admin"))):
+    """Admin assigns or reassigns an agent under a supervisor (enforcing max 50 agents per supervisor)."""
+    try:
+        with pool.connection() as conn:
+            agent = conn.execute("SELECT id, role, full_name, email FROM users WHERE id = %s", [body.agent_id]).fetchone()
+            if not agent:
+                raise HTTPException(status_code=404, detail="Agent not found")
+            if agent["role"] != "agent":
+                raise HTTPException(status_code=400, detail="Only users with 'agent' role can be assigned under a supervisor.")
+
+            if body.supervisor_id is not None:
+                supervisor = conn.execute(
+                    "SELECT id, role, full_name, is_active FROM users WHERE id = %s",
+                    [body.supervisor_id]
+                ).fetchone()
+                if not supervisor:
+                    raise HTTPException(status_code=404, detail="Supervisor not found")
+                if supervisor["role"] != "supervisor":
+                    raise HTTPException(status_code=400, detail="Target user must have the 'supervisor' role.")
+                if not supervisor["is_active"]:
+                    raise HTTPException(status_code=400, detail="Cannot assign an agent to an inactive supervisor.")
+
+                # Enforce max 50 agents limit
+                count_row = conn.execute(
+                    "SELECT COUNT(*) AS n FROM users WHERE supervisor_id = %s AND role = 'agent' AND id != %s AND is_active = true",
+                    [body.supervisor_id, body.agent_id]
+                ).fetchone()
+                if count_row and count_row["n"] >= 50:
+                    raise HTTPException(status_code=400, detail="Supervisor has reached the maximum capacity of 50 agents.")
+
+            conn.execute("UPDATE users SET supervisor_id = %s WHERE id = %s", [body.supervisor_id, body.agent_id])
+            return {
+                "success": True,
+                "message": f"Supervisor updated for agent {agent['full_name'] or agent['email']}."
+            }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Database error assigning supervisor")
+        raise HTTPException(status_code=503, detail="Database error while assigning supervisor.")
 
 
 @router.put("/users/role")

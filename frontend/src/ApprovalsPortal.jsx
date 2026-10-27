@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getPendingApprovals, approveComplaintResponse } from "./api";
+import { getPendingApprovals, approveComplaintResponse, rejectComplaintResponse } from "./api";
 import { IconCheck, IconShield, IconComplaints } from "./Icons";
 import "./ApprovalsPortal.css";
 
@@ -10,6 +10,10 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
   const [approvingId, setApprovingId] = useState(null);
   const [actionNotice, setActionNotice] = useState(null);
   const [draftEdits, setDraftEdits] = useState({});
+  const [customerEmails, setCustomerEmails] = useState({});
+  const [rejectingId, setRejectingId] = useState(null);
+  const [rejectReasons, setRejectReasons] = useState({});
+  const [rejectSubmittingId, setRejectSubmittingId] = useState(null);
 
   async function loadPending() {
     setLoading(true);
@@ -35,9 +39,18 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
     setDraftEdits((prev) => ({ ...prev, [id]: val }));
   }
 
+  function handleEmailChange(id, val) {
+    setCustomerEmails((prev) => ({ ...prev, [id]: val }));
+  }
+
+  function handleReasonChange(id, val) {
+    setRejectReasons((prev) => ({ ...prev, [id]: val }));
+  }
+
   async function handleApprove(complaint) {
     const id = complaint.complaint_id;
     const textToApprove = draftEdits[id] !== undefined ? draftEdits[id] : complaint.response_text;
+    const emailToUse = customerEmails[id] !== undefined ? customerEmails[id] : (complaint.consumer_email || "");
 
     if (!textToApprove || textToApprove.trim().length < 10) {
       alert("Resolution letter cannot be empty (must be at least 10 characters).");
@@ -48,12 +61,12 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
     setActionNotice(null);
 
     try {
-      const res = await approveComplaintResponse(id, textToApprove);
+      const res = await approveComplaintResponse(id, textToApprove, emailToUse.trim() || null);
       const emailNotice = res.email_dispatched && res.consumer_email
-        ? ` Official resolution letter emailed to ${res.consumer_email}.`
+        ? ` Official resolution letter queued for dispatch to ${res.consumer_email}.`
         : res.consumer_email
-        ? ` (Email delivery attempted to ${res.consumer_email}).`
-        : " (No consumer email on file).";
+        ? ` (Email delivery initiated for ${res.consumer_email}).`
+        : " (Approved without email dispatch - no customer email specified).";
 
       setActionNotice({
         type: "success",
@@ -75,6 +88,41 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
     }
   }
 
+  async function handleConfirmReject(complaint) {
+    const id = complaint.complaint_id;
+    const reason = (rejectReasons[id] || "").trim();
+
+    if (!reason || reason.length < 3) {
+      alert("Please provide feedback/instructions for the agent explaining why this draft is being returned.");
+      return;
+    }
+
+    setRejectSubmittingId(id);
+    setActionNotice(null);
+
+    try {
+      await rejectComplaintResponse(id, reason);
+      setActionNotice({
+        type: "success",
+        message: `Complaint #${id} draft rejected. Revision instructions dispatched to Agent ${complaint.requested_by_name || "Agent"}.`,
+      });
+
+      // Remove from list immediately
+      setPendingList((prev) => prev.filter((item) => item.complaint_id !== id));
+      setRejectingId(null);
+      if (onRefreshCount) {
+        onRefreshCount(Math.max(0, pendingList.length - 1));
+      }
+    } catch (err) {
+      setActionNotice({
+        type: "error",
+        message: `Failed to reject Complaint #${id}: ${err.message}`,
+      });
+    } finally {
+      setRejectSubmittingId(null);
+    }
+  }
+
   return (
     <div className="approvals-portal-wrapper">
       <div className="approvals-portal-header">
@@ -85,7 +133,7 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
           <div>
             <h2>Supervisor Resolution Approvals</h2>
             <p className="subtitle">
-              Review and formally approve resolution letters drafted by agents. Approving dispatches the official notice directly to the consumer's email address.
+              Review and formally sign off on agent-drafted resolution letters. Approving dispatches the official notice directly to the consumer's email address.
             </p>
           </div>
         </div>
@@ -116,7 +164,7 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
           </div>
           <h3>Queue is Clean & Up to Date</h3>
           <p className="empty-sub">
-            There are currently no agent resolution letters awaiting supervisor approval.
+            There are currently no agent resolution letters awaiting supervisor approval in your queue.
           </p>
           <button className="btn-secondary" onClick={loadPending}>
             Recheck Queue
@@ -132,6 +180,12 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
             const currentDraftText = draftEdits[item.complaint_id] !== undefined
               ? draftEdits[item.complaint_id]
               : item.response_text;
+
+            const currentEmail = customerEmails[item.complaint_id] !== undefined
+              ? customerEmails[item.complaint_id]
+              : (item.consumer_email || "");
+
+            const isRejecting = rejectingId === item.complaint_id;
 
             return (
               <div key={item.complaint_id} className="approval-card">
@@ -164,18 +218,42 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
                         <span className="meta-val">{new Date(item.requested_at).toLocaleString()}</span>
                       </div>
                     )}
-                    <div className="meta-col">
-                      <span className="meta-lbl">Consumer Email:</span>
-                      <span className={`meta-val ${item.consumer_email ? "email-tag" : "no-email-tag"}`}>
-                        {item.consumer_email || "No email on file (Letter only)"}
-                      </span>
-                    </div>
+                    {item.assigned_to_name && (
+                      <div className="meta-col">
+                        <span className="meta-lbl">Assigned Supervisor:</span>
+                        <span className="meta-val supervisor-badge">
+                          {item.assigned_to_name}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Customer Grievance Narrative */}
                   <div className="narrative-preview-box">
                     <span className="box-title">Customer Dispute Narrative:</span>
                     <p className="narrative-content">{item.narrative || "No detailed narrative provided."}</p>
+                  </div>
+
+                  {/* Customer Notification Email - Auto populated or placeholder */}
+                  <div className="delivery-email-box">
+                    <div className="box-title-row">
+                      <span className="box-title">Customer Delivery Email:</span>
+                      <span className="editor-hint">
+                        {item.consumer_email ? "Auto-populated from complaint (editable)" : "Enter email below to dispatch letter upon approval"}
+                      </span>
+                    </div>
+                    <input
+                      type="email"
+                      className="delivery-email-input"
+                      placeholder="Enter customer email address (e.g. customer@example.com)..."
+                      value={currentEmail}
+                      onChange={(e) => handleEmailChange(item.complaint_id, e.target.value)}
+                    />
+                    {!currentEmail && (
+                      <span className="no-email-hint">
+                        ⚠️ No email provided. You can type a customer email above, or approve as letter-only.
+                      </span>
+                    )}
                   </div>
 
                   {/* Editable Resolution Letter */}
@@ -192,25 +270,69 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
                     />
                   </div>
 
+                  {/* Rejection Panel (Toggleable) */}
+                  {isRejecting && (
+                    <div className="rejection-panel">
+                      <div className="rejection-panel-head">
+                        <span className="rejection-panel-title">⚠️ Rejection Reason & Revision Instructions for Agent:</span>
+                        <span className="rejection-panel-sub">Agent will be notified and can edit & re-submit</span>
+                      </div>
+                      <textarea
+                        className="rejection-reason-textarea"
+                        rows={3}
+                        placeholder="Explain what needs to be changed (e.g. missing provisional credit timeline under Regulation E, incorrect fee amount, etc.)..."
+                        value={rejectReasons[item.complaint_id] || ""}
+                        onChange={(e) => handleReasonChange(item.complaint_id, e.target.value)}
+                      />
+                      <div className="rejection-panel-actions">
+                        <button
+                          className="btn-cancel-rejection"
+                          onClick={() => setRejectingId(null)}
+                          disabled={rejectSubmittingId === item.complaint_id}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="btn-confirm-rejection"
+                          onClick={() => handleConfirmReject(item)}
+                          disabled={rejectSubmittingId === item.complaint_id}
+                        >
+                          {rejectSubmittingId === item.complaint_id ? "Submitting Rejection..." : "Confirm & Send to Agent"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Action Buttons */}
                   <div className="approval-card-actions">
                     <button
                       className="btn-approve-dispatch"
-                      disabled={approvingId === item.complaint_id}
+                      disabled={approvingId === item.complaint_id || isRejecting}
                       onClick={() => handleApprove(item)}
                     >
                       <IconCheck size={16} />
                       {approvingId === item.complaint_id
-                        ? "Approving & Emailing..."
-                        : item.consumer_email
-                        ? "Approve & Email Customer"
+                        ? "Approving & Queuing Dispatch..."
+                        : currentEmail
+                        ? `Approve & Dispatch Email (${currentEmail})`
                         : "Approve Resolution Letter"}
                     </button>
+
+                    {!isRejecting ? (
+                      <button
+                        className="btn-reject-trigger"
+                        onClick={() => setRejectingId(item.complaint_id)}
+                        disabled={approvingId === item.complaint_id}
+                      >
+                        ✕ Reject / Request Changes
+                      </button>
+                    ) : null}
+
                     <button
                       className="btn-view-explorer"
                       onClick={() => onViewComplaint(item.complaint_id)}
                     >
-                      <IconComplaints size={15} /> View Full Complaint
+                      <IconComplaints size={15} /> View Full Case
                     </button>
                   </div>
                 </div>

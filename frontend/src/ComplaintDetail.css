@@ -785,3 +785,50 @@
   border-radius: 6px;
   border: 1px solid #a7f3d0;
 }
+
+/* SUPERVISOR REJECTION BANNER */
+.supervisor-rejection-banner {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-left: 4px solid #ea580c;
+  border-radius: 8px;
+  padding: 1.15rem 1.35rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.08);
+}
+
+.rejection-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #9a3412;
+  font-size: 0.95rem;
+  margin-bottom: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.rejection-date {
+  font-size: 0.78rem;
+  color: #c2410c;
+  margin-left: auto;
+  font-weight: 500;
+}
+
+.rejection-reason-quote {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #7c2d12;
+  background: #ffffff;
+  border: 1px solid #fdba74;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.65rem;
+  font-style: italic;
+}
+
+.rejection-instruction-note {
+  font-size: 0.82rem;
+  color: #c2410c;
+  margin: 0;
+  font-weight: 500;
+}

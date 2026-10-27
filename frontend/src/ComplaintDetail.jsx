@@ -208,6 +208,7 @@ function ComplaintDetail({ id, currentUser, onClose }) {
 
   const isApproved = responseRecord?.status === "approved" || responseRecord?.status === "dispatched";
   const isPending = responseRecord?.status === "pending_approval";
+  const isRejected = responseRecord?.status === "rejected";
 
   const approverRole = (responseRecord?.approved_by_role || "Supervisor").toUpperCase();
   const approverName = responseRecord?.approved_by_name || "Compliance Officer";
@@ -453,6 +454,24 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                   </div>
                 )}
 
+                {isRejected && (
+                  <div className="supervisor-rejection-banner">
+                    <div className="rejection-banner-head">
+                      <span className="rejection-icon">⚠️</span>
+                      <strong>Revisions Requested by {responseRecord?.rejected_by_name || "Supervisor"}</strong>
+                      {responseRecord?.rejected_at && (
+                        <span className="rejection-date">{new Date(responseRecord.rejected_at).toLocaleString()}</span>
+                      )}
+                    </div>
+                    <div className="rejection-reason-quote">
+                      "{responseRecord?.rejection_reason || "Revisions required."}"
+                    </div>
+                    <p className="rejection-instruction-note">
+                      Please review the feedback above, edit the draft resolution letter below, and re-submit for approval.
+                    </p>
+                  </div>
+                )}
+
                 {replyDraft && (
                   <div className="reply-container">
                     <p className="reply-instruction">
@@ -511,6 +530,8 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                               >
                                 {approving
                                   ? "Submitting..."
+                                  : isRejected
+                                  ? "Re-submit for Supervisor Approval"
                                   : isPending
                                   ? "Update & Resubmit Draft"
                                   : "Submit Draft for Supervisor Approval"}

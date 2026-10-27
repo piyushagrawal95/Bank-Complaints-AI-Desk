@@ -405,3 +405,76 @@ def send_supervisor_approval_request_email(
         text_content=text_content,
         client_origin=client_origin,
     )
+
+
+
+def send_agent_rejection_notification_email(
+    to_email: str,
+    agent_name: str,
+    complaint_id: int,
+    company: str,
+    supervisor_name: str,
+    reason: str,
+    client_origin: str | None = None,
+) -> bool:
+    """Dispatches a notification email to an agent when a supervisor requests changes / rejects a draft."""
+    subject = f"Revisions Required: Complaint #{complaint_id} ({company})"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 24px; }}
+        .card {{ max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #fed7aa; border-radius: 12px; padding: 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }}
+        .badge {{ background: #fff7ed; color: #c2410c; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; display: inline-block; text-transform: uppercase; border: 1px solid #fdba74; margin-bottom: 12px; }}
+        .title {{ font-size: 20px; font-weight: 700; color: #9a3412; margin: 0 0 16px; }}
+        .feedback-box {{ background: #fff7ed; border-left: 4px solid #ea580c; border-radius: 6px; padding: 16px; color: #7c2d12; font-size: 14px; line-height: 1.6; white-space: pre-wrap; margin: 20px 0; }}
+        .footer {{ font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 18px; margin-top: 24px; }}
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <span class="badge">Revisions Requested</span>
+        <h1 class="title">Resolution Draft Requires Update</h1>
+        <p>Dear {agent_name or 'Agent'},</p>
+        <p>Supervisor <strong>{supervisor_name}</strong> has reviewed your resolution draft for Complaint <strong>#{complaint_id}</strong> ({company}) and requested modifications before it can be approved for customer dispatch.</p>
+        
+        <p style="font-weight: 600; font-size: 14px; margin-bottom: 6px;">Supervisor Feedback & Instructions:</p>
+        <div class="feedback-box">{reason}</div>
+
+        <p style="font-size: 14px; color: #475569;">Please log into the Bank Complaint AI Desk, update your draft according to the feedback above, and re-submit it for approval.</p>
+
+        <div class="footer">
+          <p>Bank Complaint AI Desk &bull; Regulatory Compliance Operations</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+
+    text_content = f"""
+    Revisions Requested — Complaint #{complaint_id}
+    
+    Dear {agent_name or 'Agent'},
+    
+    Supervisor {supervisor_name} has reviewed your resolution draft for Complaint #{complaint_id} ({company}) and requested changes.
+    
+    Feedback / Instructions:
+    --------------------------------------------------
+    {reason}
+    --------------------------------------------------
+    
+    Please sign into the Bank Complaint AI Desk, edit your response, and re-submit for approval.
+    
+    Bank Complaint AI Desk - Regulatory Compliance Operations
+    """
+
+    return dispatch_email_transport(
+        to_email=to_email,
+        subject=subject,
+        html_content=html_content,
+        text_content=text_content,
+        client_origin=client_origin,
+    )
