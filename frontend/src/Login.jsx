@@ -366,77 +366,20 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
 
   return (
     <div className="auth-shell">
-      {/* LEFT BRANDING PANEL */}
-      <div className="auth-brand-side">
-        <div className="brand-inner">
-          <div className="bank-emblem">
-            <div className="emblem-icon">
-              <IconShield size={24} />
-            </div>
-            <div className="emblem-text">
-              <span className="bank-name">Bank Complaint AI Desk</span>
-              <span className="bank-sub">Federal Compliance & Resolution System</span>
-            </div>
+      {/* POPUP HEADER / NAVBAR */}
+      <div className="auth-popup-header">
+        <div className="auth-popup-brand">
+          <div className="auth-popup-logo">
+            <IconShield size={20} />
           </div>
-
-          <h2 className="brand-headline">
-            Intelligent Complaint Intelligence & Regulatory Compliance
-          </h2>
-          <p className="brand-subtext">
-            Enterprise compliance platform powered by advanced semantic retrieval, dynamic chunking of 12 CFR federal banking regulations, and automated complaint resolution workflows.
-          </p>
-
-          <div className="pillar-list">
-            <div className="pillar-item">
-              <span className="pillar-bullet"></span>
-              <div className="pillar-info">
-                <span className="pillar-title">Automated Issue Classification</span>
-                <span className="pillar-desc">Categorizes complaints and synthesizes executive summaries instantly.</span>
-              </div>
-            </div>
-            <div className="pillar-item">
-              <span className="pillar-bullet"></span>
-              <div className="pillar-info">
-                <span className="pillar-title">Multi-Regulation RAG (12 CFR)</span>
-                <span className="pillar-desc">Exact legal citations and answers across Regulation E, F, V, and Z.</span>
-              </div>
-            </div>
-            <div className="pillar-item">
-              <span className="pillar-bullet"></span>
-              <div className="pillar-info">
-                <span className="pillar-title">Similar Precedents & AI Reply Drafting</span>
-                <span className="pillar-desc">Finds resolved cases and drafts official response letters for review.</span>
-              </div>
-            </div>
-            <div className="pillar-item">
-              <span className="pillar-bullet"></span>
-              <div className="pillar-info">
-                <span className="pillar-title">Operational Spikes & Baseline Analytics</span>
-                <span className="pillar-desc">Anomaly detection comparing rolling-window traffic with historical averages.</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="trust-footer">
-            <div className="trust-item">
-              <span className="trust-val">12 CFR</span>
-              <span className="trust-lbl">Reg E, F, V, Z</span>
-            </div>
-            <div className="trust-sep"></div>
-            <div className="trust-item">
-              <span className="trust-val">Multi-RAG</span>
-              <span className="trust-lbl">Compliance Search</span>
-            </div>
-            <div className="trust-sep"></div>
-            <div className="trust-item">
-              <span className="trust-val">RBAC</span>
-              <span className="trust-lbl">Agent / Super / Admin</span>
-            </div>
+          <div className="auth-popup-brand-text">
+            <span className="auth-popup-title">Bank Complaint Desk</span>
+            <span className="auth-popup-subtitle">Enterprise Portal</span>
           </div>
         </div>
       </div>
 
-      {/* RIGHT AUTH CARD PANEL */}
+      {/* AUTH FORM CARD */}
       <div className="auth-form-side">
         <div className="auth-card-modern">
           <div className="auth-card-head">

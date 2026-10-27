@@ -1,170 +1,73 @@
 .auth-shell {
-  min-height: 100vh;
   display: flex;
-  background: #f8fafc;
+  flex-direction: column;
+  background: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
   color: #0f172a;
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 /* =========================================
-   LEFT BRANDING PANEL (Calm Navy Blueprint)
+   POPUP TOP NAVBAR / BRAND BAR
    ========================================= */
-.auth-brand-side {
-  flex: 1.1;
-  background: #090e1a;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.45) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.15) 0px, transparent 50%);
-  color: #ffffff;
-  padding: 4rem 3.5rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  border-right: 1px solid #1e293b;
-}
-
-.brand-inner {
-  max-width: 520px;
-}
-
-.bank-emblem {
+.auth-popup-header {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  margin-bottom: 2.25rem;
+  justify-content: space-between;
+  padding: 1.15rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
-.emblem-icon {
-  width: 44px;
-  height: 44px;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 10px;
+.auth-popup-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.auth-popup-logo {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #38bdf8;
-}
-
-.emblem-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.bank-name {
-  font-weight: 600;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
   color: #ffffff;
-}
-
-.bank-sub {
-  font-size: 0.78rem;
-  color: #94a3b8;
-  font-weight: 400;
-}
-
-.brand-headline {
-  font-size: 1.85rem;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
-  color: #f8fafc;
-  margin: 0 0 1rem;
-}
-
-.brand-subtext {
-  font-size: 0.92rem;
-  line-height: 1.6;
-  color: #94a3b8;
-  margin: 0 0 2.25rem;
-  font-weight: 400;
-}
-
-/* Strategic Pillars List */
-.pillar-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-  margin-bottom: 2.75rem;
-}
-
-.pillar-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.85rem;
-}
-
-.pillar-bullet {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #38bdf8;
-  margin-top: 0.45rem;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
   flex-shrink: 0;
-  box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
 }
 
-.pillar-info {
+.auth-popup-brand-text {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
 }
 
-.pillar-title {
-  color: #f1f5f9;
-  font-size: 0.92rem;
+.auth-popup-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.auth-popup-subtitle {
+  font-size: 0.75rem;
+  color: #64748b;
   font-weight: 500;
 }
 
-.pillar-desc {
-  color: #94a3b8;
-  font-size: 0.82rem;
-  font-weight: 400;
-  line-height: 1.45;
-}
-
-/* Trust footer bar */
-.trust-footer {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  padding-top: 1.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.trust-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.trust-val {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #38bdf8;
-}
-
-.trust-lbl {
-  font-size: 0.75rem;
-  color: #64748b;
-  font-weight: 400;
-}
-
-.trust-sep {
-  width: 1px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
 /* =========================================
-   RIGHT AUTH FORM PANEL
+   AUTH FORM CONTAINER (WHITE CARD)
    ========================================= */
 .auth-form-side {
-  flex: 0.95;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3rem 2rem;
+  padding: 1.75rem 1.75rem 2rem;
+  background: #ffffff;
 }
 
 .auth-card-modern {
@@ -173,10 +76,10 @@
   width: 100%;
   max-width: 440px;
   background: #ffffff;
-  padding: 2.25rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
-  border: 1px solid #e2e8f0;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
 }
 
 .auth-card-head {

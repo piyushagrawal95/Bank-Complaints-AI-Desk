@@ -25,10 +25,6 @@ export default function LandingPage({ onOpenAuth }) {
             </div>
           </div>
 
-          <nav className="landing-nav-links">
-            <a href="#features">Features</a>
-          </nav>
-
           <div className="landing-nav-actions">
             <button
               className="btn-landing-login"
