@@ -9,6 +9,8 @@ venv/
 # CFPB Data & Large Files (never commit to git per PDF rules)
 data/
 *.csv
+*.xlsx
+*.xls
 *.zip
 *.pdf
 outbox/

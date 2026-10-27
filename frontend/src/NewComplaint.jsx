@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { createComplaint, extractComplaintFile } from "./api";
+import { createComplaint, createComplaintsBatch, extractComplaintFile } from "./api";
 import { IconCheck, IconComplaints, IconSparkles } from "./Icons";
 import "./NewComplaint.css";
 
@@ -45,6 +45,11 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
   const [error, setError] = useState(null);
   const [createdComplaint, setCreatedComplaint] = useState(null);
 
+  // Batch Multi-Record Ingestion states
+  const [batchData, setBatchData] = useState(null);
+  const [batchSuccess, setBatchSuccess] = useState(null);
+  const [batchSaving, setBatchSaving] = useState(false);
+
   const fileInputRef = useRef(null);
 
   function handleChange(field, value) {
@@ -58,10 +63,19 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
     setExtracting(true);
     setError(null);
     setExtractSuccess(null);
+    setBatchData(null);
+    setBatchSuccess(null);
+    setCreatedComplaint(null);
 
     try {
       const res = await extractComplaintFile(file);
-      if (res && res.extracted) {
+      if (res && res.is_batch && res.records && res.records.length > 1) {
+        setBatchData({
+          filename: file.name,
+          count: res.count,
+          records: res.records,
+        });
+      } else if (res && res.extracted) {
         const ext = res.extracted;
         setForm((prev) => ({
           ...prev,
@@ -91,6 +105,47 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
         fileInputRef.current.value = "";
       }
     }
+  }
+
+  async function handleBatchSubmit() {
+    if (!batchData || !batchData.records) return;
+    setBatchSaving(true);
+    setError(null);
+
+    try {
+      const res = await createComplaintsBatch(batchData.records);
+      setBatchSuccess({
+        filename: batchData.filename,
+        count: res.count,
+        complaints: res.complaints || [],
+      });
+      setBatchData(null);
+    } catch (err) {
+      setError(err.message || "Failed to batch ingest complaints.");
+    } finally {
+      setBatchSaving(false);
+    }
+  }
+
+  function handleSelectBatchSingleRecord(rec) {
+    setForm({
+      product: rec.product || "Checking or savings account",
+      sub_product: rec.sub_product || "",
+      issue: rec.issue || "",
+      sub_issue: rec.sub_issue || "",
+      company: rec.company || "JPMorgan Chase & Co.",
+      state: rec.state || "NY",
+      zip_code: rec.zip_code || "",
+      consumer_email: rec.consumer_email || "",
+      narrative: rec.narrative || "",
+      date_received: rec.date_received || new Date().toISOString().split("T")[0],
+    });
+    setBatchData(null);
+    setExtractSuccess({
+      filename: batchData.filename,
+      hasEmail: Boolean(rec.consumer_email),
+      email: rec.consumer_email,
+    });
   }
 
   async function handleSubmit(e) {
@@ -125,6 +180,8 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
     setForm(INITIAL_FORM);
     setExtractSuccess(null);
     setCreatedComplaint(null);
+    setBatchData(null);
+    setBatchSuccess(null);
     setError(null);
   }
 
@@ -144,7 +201,113 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
         </div>
       </div>
 
-      {createdComplaint ? (
+      {/* BATCH SUCCESS CARD */}
+      {batchSuccess ? (
+        <div className="success-banner-card">
+          <div className="success-icon-ring">
+            <IconCheck size={32} />
+          </div>
+          <h3>Batch Ingestion Completed Successfully!</h3>
+          <p className="success-lead">
+            <strong>{batchSuccess.count} complaint records</strong> from <strong>{batchSuccess.filename}</strong> have been indexed and saved in the database.
+          </p>
+
+          <div className="batch-preview-table-card">
+            <table className="batch-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Bank / Entity</th>
+                  <th>Product Vertical</th>
+                  <th>Primary Issue</th>
+                  <th>Consumer Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchSuccess.complaints.map((c, i) => (
+                  <tr key={c.complaint_id || i}>
+                    <td><strong className="complaint-id-link">#{c.complaint_id}</strong></td>
+                    <td>{c.company}</td>
+                    <td>{c.product}</td>
+                    <td>{c.issue}</td>
+                    <td>{c.consumer_email || "Not specified"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="success-actions" style={{ marginTop: "24px" }}>
+            <button className="btn-primary" onClick={onGoToComplaints}>
+              Go to Complaints Explorer
+            </button>
+            <button className="btn-outline" onClick={handleReset}>
+              + Ingest Another File
+            </button>
+          </div>
+        </div>
+      ) : batchData ? (
+        /* MULTI-RECORD BATCH PREVIEW CARD */
+        <div className="batch-detect-card">
+          <div className="batch-detect-header">
+            <div className="batch-badge">Multi-Record File Detected</div>
+            <h3>{batchData.count} Individual Complaints Found in "{batchData.filename}"</h3>
+            <p className="batch-sub">
+              The uploaded file contains multiple dispute records. You can ingest all records in bulk into the database or choose to edit the first record in the standard form.
+            </p>
+          </div>
+
+          <div className="batch-preview-table-card">
+            <table className="batch-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Bank / Entity</th>
+                  <th>Product Vertical</th>
+                  <th>Dispute Issue</th>
+                  <th>Consumer Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchData.records.map((rec, idx) => (
+                  <tr key={idx}>
+                    <td><strong>{idx + 1}</strong></td>
+                    <td>{rec.company}</td>
+                    <td>{rec.product}</td>
+                    <td>{rec.issue}</td>
+                    <td>{rec.consumer_email || "Not specified"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="batch-actions-row">
+            <button
+              className="btn-primary"
+              disabled={batchSaving}
+              onClick={handleBatchSubmit}
+            >
+              {batchSaving ? "Ingesting All Records..." : `Ingest All ${batchData.count} Complaints into Database`}
+            </button>
+            <button
+              className="btn-secondary"
+              disabled={batchSaving}
+              onClick={() => handleSelectBatchSingleRecord(batchData.records[0])}
+            >
+              Edit First Record in Form
+            </button>
+            <button
+              className="btn-outline"
+              disabled={batchSaving}
+              onClick={handleReset}
+            >
+              Cancel / Choose Another File
+            </button>
+          </div>
+        </div>
+      ) : createdComplaint ? (
+        /* SINGLE COMPLAINT SUCCESS CARD */
         <div className="success-banner-card">
           <div className="success-icon-ring">
             <IconCheck size={32} />
@@ -196,10 +359,18 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
           <div className="upload-dropzone-card">
             <div className="dropzone-inner">
               <div className="upload-prompt-text">
-                <div className="upload-icon-graphic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div>
+                <div className="upload-icon-graphic">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                </div>
                 <h4>Intelligent Document Ingestion</h4>
                 <p>
-                  Upload a <strong>PDF, Word (.docx), Excel (.xlsx/.xls), CSV, or TXT</strong> dispute document to automatically extract the narrative, bank entity, and consumer email address.
+                  Upload a <strong>PDF, Word (.docx), Excel (.xlsx/.xls), CSV, or TXT</strong> dispute document to automatically extract the narrative, bank entity, and consumer email address. Multi-record files will automatically trigger batch ingestion.
                 </p>
               </div>
 

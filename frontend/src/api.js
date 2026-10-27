@@ -142,6 +142,9 @@ export const updateComplaintEmail = (id, consumer_email) =>
 export const createComplaint = (data) =>
   request("/complaints/create", { method: "POST", body: data });
 
+export const createComplaintsBatch = (complaints) =>
+  request("/complaints/batch-create", { method: "POST", body: { complaints } });
+
 export async function extractComplaintFile(file) {
   const token = getToken();
   const formData = new FormData();

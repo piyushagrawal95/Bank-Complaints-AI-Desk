@@ -210,3 +210,110 @@ def parse_complaint_from_text(raw_text: str, filename: str = "") -> dict:
         "date_received": date.today().isoformat(),
         "submitted_via": "File Upload" if filename else "Web Portal",
     }
+
+
+
+def extract_complaints_from_file(filename: str, content: bytes) -> dict:
+    """Extracts either a single complaint or multiple complaints from PDF, Word, Excel, CSV."""
+    fn = filename.lower()
+
+    # 1. Check Excel / CSV for multiple rows
+    if fn.endswith(".xlsx") or fn.endswith(".xls") or fn.endswith(".csv"):
+        import pandas as pd
+        try:
+            if fn.endswith(".csv"):
+                df = pd.read_csv(io.BytesIO(content), dtype=str)
+            else:
+                df = pd.read_excel(io.BytesIO(content), dtype=str)
+
+            if len(df) > 1:
+                def find_col(aliases):
+                    for col in df.columns:
+                        c_clean = str(col).lower().replace("_", " ").replace("-", " ").strip()
+                        for a in aliases:
+                            if a in c_clean:
+                                return col
+                    return None
+
+                c_company = find_col(["company", "bank", "institution", "lender"])
+                c_product = find_col(["product", "category", "vertical", "account type"])
+                c_issue = find_col(["issue", "subject", "dispute", "reason", "type"])
+                c_email = find_col(["email", "mail", "consumer email", "customer email"])
+                c_narrative = find_col(["narrative", "story", "complaint", "details", "description", "comment"])
+                c_state = find_col(["state"])
+                c_zip = find_col(["zip", "postal"])
+                c_date = find_col(["date", "received"])
+
+                records = []
+                for _, row in df.iterrows():
+                    narr = ""
+                    if c_narrative and pd.notna(row.get(c_narrative)):
+                        narr = str(row[c_narrative]).strip()
+                    if not narr:
+                        items = [f"{col}: {val}" for col, val in row.items() if pd.notna(val) and str(val).strip()]
+                        narr = " | ".join(items)
+
+                    if len(narr) < 10:
+                        continue
+
+                    parsed = parse_complaint_from_text(narr, filename)
+
+                    if c_company and pd.notna(row.get(c_company)) and str(row[c_company]).strip():
+                        parsed["company"] = str(row[c_company]).strip()
+                    if c_product and pd.notna(row.get(c_product)) and str(row[c_product]).strip():
+                        parsed["product"] = str(row[c_product]).strip()
+                    if c_issue and pd.notna(row.get(c_issue)) and str(row[c_issue]).strip():
+                        parsed["issue"] = str(row[c_issue]).strip()
+                    if c_email and pd.notna(row.get(c_email)) and str(row[c_email]).strip():
+                        parsed["consumer_email"] = str(row[c_email]).strip().lower()
+                    if c_state and pd.notna(row.get(c_state)) and str(row[c_state]).strip():
+                        parsed["state"] = str(row[c_state]).strip().upper()[:2]
+                    if c_zip and pd.notna(row.get(c_zip)) and str(row[c_zip]).strip():
+                        parsed["zip_code"] = str(row[c_zip]).strip()[:10]
+                    if c_date and pd.notna(row.get(c_date)) and str(row[c_date]).strip():
+                        parsed["date_received"] = str(row[c_date]).strip()[:10]
+
+                    records.append(parsed)
+
+                if len(records) > 1:
+                    return {
+                        "is_batch": True,
+                        "count": len(records),
+                        "records": records,
+                        "extracted": records[0],
+                        "raw_text": f"Found {len(records)} dispute records in spreadsheet.",
+                    }
+        except Exception as e:
+            logger.warning("Error parsing multi-row spreadsheet: %s", e)
+
+    # 2. Check PDF / Text for multiple distinct sections
+    raw_text = extract_raw_text(filename, content)
+
+    split_pattern = r"(?i)(?:^|\n)(?:[-=]{3,}\s*(?:dispute|complaint|record|case)\s*#?\d*.*?[-=]{3,}|(?:dispute|complaint|case)\s*#\s*\d+\s*:)"
+    chunks = re.split(split_pattern, raw_text)
+    meaningful_chunks = [c.strip() for c in chunks if len(c.strip()) > 50]
+
+    if len(meaningful_chunks) > 1:
+        records = []
+        for idx, chunk in enumerate(meaningful_chunks, 1):
+            p = parse_complaint_from_text(chunk, f"{filename} (Record #{idx})")
+            if p and len(p.get("narrative", "")) > 10:
+                records.append(p)
+        if len(records) > 1:
+            return {
+                "is_batch": True,
+                "count": len(records),
+                "records": records,
+                "extracted": records[0],
+                "raw_text": raw_text,
+            }
+
+    # 3. Default single complaint
+    single = parse_complaint_from_text(raw_text, filename)
+    return {
+        "is_batch": False,
+        "count": 1,
+        "records": [single],
+        "extracted": single,
+        "raw_text": raw_text,
+    }

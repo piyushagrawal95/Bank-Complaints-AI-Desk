@@ -472,3 +472,88 @@
   .dropzone-inner { flex-direction: column; align-items: flex-start; }
   .form-grid-2 { grid-template-columns: 1fr; }
 }
+
+
+/* BATCH MULTI-RECORD INGESTION STYLES */
+.batch-detect-card {
+  background: #ffffff;
+  border: 1px solid #93c5fd;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 10px 25px rgba(2, 132, 199, 0.08);
+  animation: fadeUp 0.25s ease-out;
+  margin-bottom: 24px;
+}
+
+.batch-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+  border: 1px solid #bfdbfe;
+}
+
+.batch-detect-header h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px;
+}
+
+.batch-sub {
+  font-size: 14px;
+  color: #475569;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.batch-preview-table-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin-bottom: 24px;
+  background: #ffffff;
+}
+
+.batch-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.batch-table th {
+  background: #f8fafc;
+  padding: 12px 16px;
+  color: #475569;
+  font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.batch-table td {
+  padding: 12px 16px;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.batch-table tr:last-child td {
+  border-bottom: none;
+}
+
+.complaint-id-link {
+  color: #0284c7;
+}
+
+.batch-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}

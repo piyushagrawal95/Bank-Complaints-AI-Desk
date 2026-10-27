@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.db import pool
 from app.deps import get_current_user
 from app.email_service import send_complaint_approval_email
-from app.file_extractor import extract_raw_text, parse_complaint_from_text
+from app.file_extractor import extract_raw_text, parse_complaint_from_text, extract_complaints_from_file
 from app.llm.analysis import (
     BASIS_METADATA,
     BASIS_NARRATIVE,
@@ -152,19 +152,15 @@ async def extract_complaint_file(file: UploadFile = File(...)):
         if len(content) > 15 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File size exceeds maximum 15MB limit.")
 
-        raw_text = extract_raw_text(filename, content)
-        if not raw_text or len(raw_text.strip()) < 10:
-            raise HTTPException(
-                status_code=422,
-                detail="Could not extract readable text from the document. Please verify the file content.",
-            )
-
-        extracted = parse_complaint_from_text(raw_text, filename)
+        res = extract_complaints_from_file(filename, content)
         return {
             "success": True,
             "filename": filename,
-            "extracted": extracted,
-            "character_count": len(raw_text),
+            "is_batch": res["is_batch"],
+            "count": res["count"],
+            "records": res["records"],
+            "extracted": res["extracted"],
+            "character_count": len(res.get("raw_text", "")),
         }
     except HTTPException:
         raise
@@ -265,6 +261,57 @@ def get_complaint(complaint_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="Complaint not found")
     return {**row, "analysis": analysis, "response": response}
+
+
+
+
+
+class BatchCreateIn(BaseModel):
+    complaints: list[CreateComplaintIn]
+
+
+@router.post("/batch-create")
+def batch_create_complaints(body: BatchCreateIn, user: dict = Depends(get_current_user)):
+    """Inserts multiple complaints into the database in a single batch operation."""
+    if not body.complaints:
+        raise HTTPException(status_code=400, detail="No complaints provided for batch creation.")
+    if len(body.complaints) > 200:
+        raise HTTPException(status_code=400, detail="Batch exceeds maximum limit of 200 complaints per upload.")
+
+    created_list = []
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                for item in body.complaints:
+                    date_rcvd = item.date_received or date.today()
+                    clean_email = (item.consumer_email or "").strip().lower() or None
+                    clean_state = (item.state or "").strip().upper() or "NY"
+                    clean_zip = (item.zip_code or "").strip() or None
+
+                    cur.execute(
+                        """
+                        INSERT INTO complaints (
+                            product, sub_product, issue, sub_issue,
+                            company, state, zip_code, consumer_email,
+                            consumer_complaint_narrative, submitted_via,
+                            date_received
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING complaint_id, product, company, issue, consumer_email, date_received;
+                        """,
+                        (
+                            item.product, item.sub_product, item.issue, item.sub_issue,
+                            item.company, clean_state, clean_zip, clean_email,
+                            item.narrative, "Bulk File Upload",
+                            date_rcvd,
+                        ),
+                    )
+                    row = cur.fetchone()
+                    created_list.append(row)
+            conn.commit()
+        return {"success": True, "count": len(created_list), "complaints": created_list}
+    except Exception as exc:
+        logger.exception("Error in batch complaint creation")
+        raise HTTPException(status_code=500, detail=f"Failed to batch create complaints: {str(exc)}")
 
 
 @router.put("/{complaint_id}/email")
