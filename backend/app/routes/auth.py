@@ -128,14 +128,16 @@ def signup(body: SignupIn, request: Request):
 
     email = body.email.lower()
     super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
-    init_role = "admin" if (email == super_admin or email == "piyushagrawal300504@gmail.com") else "agent"
+    is_super = (email == super_admin or email == "piyushagrawal300504@gmail.com")
+    init_role = "admin" if is_super else "agent"
+    init_active = True if is_super else False
     try:
         with pool.connection() as conn:
             row = conn.execute(
                 "INSERT INTO users (email, password_hash, full_name, role, is_active) "
-                "VALUES (%s, %s, %s, %s, true) ON CONFLICT (email) DO NOTHING "
+                "VALUES (%s, %s, %s, %s, %s) ON CONFLICT (email) DO NOTHING "
                 "RETURNING id, email, full_name, role, is_active",
-                [email, hash_password(body.password), body.full_name, init_role],
+                [email, hash_password(body.password), body.full_name, init_role, init_active],
             ).fetchone()
     except Exception as exc:
         logger.exception("Database error during signup")
@@ -162,7 +164,7 @@ def signup(body: SignupIn, request: Request):
     except Exception as exc:
         print(f"[MAIL ERROR] Failed to send email: {exc}")
 
-    msg = "Account created successfully! You can now sign in with your credentials."
+    msg = "Account created successfully! Please verify your email before logging in."
     if email_sent:
         msg = "Account created successfully! A confirmation email has been dispatched to your inbox (check Spam/Junk if not visible)."
 
