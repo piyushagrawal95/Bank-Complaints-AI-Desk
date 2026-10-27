@@ -8,7 +8,7 @@ import {
   requestComplaintApproval,
   updateComplaintEmail,
 } from "./api";
-import { IconCheck, IconSparkles } from "./Icons";
+import { IconCheck, IconSparkles, IconSearch } from "./Icons";
 import "./ComplaintDetail.css";
 
 function ComplaintDetail({ id, currentUser, onClose }) {
@@ -29,6 +29,7 @@ function ComplaintDetail({ id, currentUser, onClose }) {
   // Similar Complaints
   const [similarCases, setSimilarCases] = useState([]);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
+  const [hasSearchedSimilar, setHasSearchedSimilar] = useState(false);
 
   // AI Draft Reply & Approval Workflow
   const [replyDraft, setReplyDraft] = useState("");
@@ -104,11 +105,13 @@ function ComplaintDetail({ id, currentUser, onClose }) {
 
   async function loadSimilarCases() {
     setLoadingSimilar(true);
+    setHasSearchedSimilar(true);
     try {
       const res = await getSimilarComplaints(id);
       setSimilarCases(res.similar || []);
     } catch (err) {
       console.error(err);
+      setSimilarCases([]);
     } finally {
       setLoadingSimilar(false);
     }
@@ -350,37 +353,89 @@ function ComplaintDetail({ id, currentUser, onClose }) {
               {/* Similar Past Complaints */}
               <section className="section-block">
                 <div className="section-head-row">
-                  <h3>Similar Past Precedent Cases</h3>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#0f172a" }}>
+                      Similar Past Precedent Cases
+                    </h3>
+                    <p style={{ margin: "3px 0 0", fontSize: "0.82rem", color: "#64748b" }}>
+                      Historical complaints with matching dispute patterns and regulatory resolutions
+                    </p>
+                  </div>
                   <button
-                    className="secondary fetch-similar-btn"
+                    className="fetch-similar-btn"
                     disabled={loadingSimilar}
                     onClick={loadSimilarCases}
                   >
-                    {loadingSimilar ? "Searching Precedents..." : "Find Precedent Cases"}
+                    {loadingSimilar ? (
+                      <>
+                        <span className="inline-spinner" style={{ width: 13, height: 13, borderWidth: 2 }} />
+                        <span>Searching Precedents...</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconSearch size={14} />
+                        <span>{similarCases.length > 0 ? "Refresh Precedents" : "Find Precedent Cases"}</span>
+                      </>
+                    )}
                   </button>
                 </div>
 
-                {similarCases.length > 0 && (
-                  <div className="similar-list">
-                    {similarCases.map((c) => (
-                      <div key={c.complaint_id} className="similar-item">
-                        <div className="similar-meta">
-                          <span className="sim-id">Case #{c.complaint_id}</span>
-                          <span className="sim-score">
-                            Match: {Math.round(c.similarity * 100)}%
-                          </span>
-                          <span className="sim-date">{c.date_received}</span>
-                        </div>
-                        <p className="sim-issue"><strong>Issue:</strong> {c.issue}</p>
-                        {c.company_response_to_consumer && (
-                          <p className="sim-response">
-                            <strong>Past Resolution:</strong> {c.company_response_to_consumer}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                {loadingSimilar ? (
+                  <div className="similar-loading-state">
+                    <span className="inline-spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                    <span>Searching vector embeddings and regulatory precedent history...</span>
                   </div>
-                )}
+                ) : similarCases.length > 0 ? (
+                  <div className="similar-grid">
+                    {similarCases.map((c) => {
+                      const matchPct = Math.round((c.similarity || 0.75) * 100);
+                      const isHighMatch = matchPct >= 80;
+                      return (
+                        <div key={c.complaint_id} className="similar-card">
+                          <div className="similar-card-top">
+                            <span className="similar-case-id">Case #{c.complaint_id}</span>
+                            <span className={`similar-match-pill ${isHighMatch ? "high-match" : "mid-match"}`}>
+                              {matchPct}% Match
+                            </span>
+                          </div>
+
+                          <div className="similar-card-sub">
+                            <span className="similar-bank" title={c.company || "Bank"}>
+                              🏢 {c.company || "Financial Institution"}
+                            </span>
+                            <span className="similar-date">
+                              📅 {c.date_received || "N/A"}
+                            </span>
+                          </div>
+
+                          <div className="similar-issue-row">
+                            <span className="similar-issue-label">Dispute Issue</span>
+                            <p className="similar-issue-text">{c.issue}</p>
+                          </div>
+
+                          {c.narrative && (
+                            <div className="similar-narrative-preview">
+                              "{c.narrative.length > 140 ? c.narrative.slice(0, 140) + "..." : c.narrative}"
+                            </div>
+                          )}
+
+                          {c.company_response_to_consumer && (
+                            <div className="similar-resolution-box">
+                              <span className="similar-res-label">Past Outcome</span>
+                              <div className="similar-res-badge">
+                                {c.company_response_to_consumer}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : hasSearchedSimilar ? (
+                  <div className="similar-empty">
+                    No historical precedent cases found matching this dispute.
+                  </div>
+                ) : null}
               </section>
 
               {/* AI Draft Reply & Human-in-the-Loop Approval */}
