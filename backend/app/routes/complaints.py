@@ -236,6 +236,29 @@ def create_complaint(body: CreateComplaintIn, user: dict = Depends(get_current_u
         raise HTTPException(status_code=503, detail="Failed to record complaint in database.")
 
 
+@router.get("/pending-approvals")
+def list_pending_approvals(user=Depends(get_current_user)):
+    """Lists all complaints with draft responses currently awaiting supervisor approval."""
+    sql = """
+        SELECT 
+            c.complaint_id, c.date_received, c.product, c.issue, c.company,
+            c.state, c.consumer_email, c.narrative,
+            cr.response_text, cr.requested_by_name, cr.requested_by_role,
+            cr.requested_at, cr.status, cr.assigned_to_name, cr.assigned_to_email
+        FROM complaints c
+        JOIN complaint_responses cr ON c.complaint_id = cr.complaint_id
+        WHERE cr.status = 'pending_approval'
+        ORDER BY cr.requested_at DESC NULLS LAST;
+    """
+    try:
+        with pool.connection() as conn:
+            rows = conn.execute(sql).fetchall()
+        return {"count": len(rows), "items": rows}
+    except Exception as exc:
+        logger.exception("Error fetching pending approvals")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch pending approvals: {str(exc)}")
+
+
 @router.get("/{complaint_id}")
 def get_complaint(complaint_id: int):
     try:
@@ -490,29 +513,6 @@ def draft_complaint_reply(complaint_id: int, body: DraftReplyIn | None = None):
         "model": settings.llm_model,
         "status": "ready_for_approval",
     }
-
-
-@router.get("/pending-approvals")
-def list_pending_approvals(user=Depends(get_current_user)):
-    """Lists all complaints with draft responses currently awaiting supervisor approval."""
-    sql = """
-        SELECT 
-            c.complaint_id, c.date_received, c.product, c.issue, c.company,
-            c.state, c.consumer_email, c.narrative,
-            cr.response_text, cr.requested_by_name, cr.requested_by_role,
-            cr.requested_at, cr.status, cr.assigned_to_name, cr.assigned_to_email
-        FROM complaints c
-        JOIN complaint_responses cr ON c.complaint_id = cr.complaint_id
-        WHERE cr.status = 'pending_approval'
-        ORDER BY cr.requested_at DESC NULLS LAST;
-    """
-    try:
-        with pool.connection() as conn:
-            rows = conn.execute(sql).fetchall()
-        return {"count": len(rows), "items": rows}
-    except Exception as exc:
-        logger.exception("Error fetching pending approvals")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch pending approvals: {str(exc)}")
 
 
 @router.post("/{complaint_id}/request-approval")
