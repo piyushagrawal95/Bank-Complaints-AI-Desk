@@ -356,7 +356,7 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                     disabled={loadingSimilar}
                     onClick={loadSimilarCases}
                   >
-                    {loadingSimilar ? "Searching Precedents..." : "🔍 Find Precedent Cases"}
+                    {loadingSimilar ? "Searching Precedents..." : "Find Precedent Cases"}
                   </button>
                 </div>
 
@@ -388,7 +388,7 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                 <div className="section-head-row">
                   <h3>Official Bank Resolution Letter</h3>
                   <button className="draft-ai-btn" disabled={drafting} onClick={generateDraft}>
-                    {drafting ? "Drafting with AI..." : replyDraft ? "↻ Regenerate Draft" : "✍️ Draft Reply with AI"}
+                    {drafting ? "Drafting with AI..." : replyDraft ? "Regenerate Draft" : "Draft Reply with AI"}
                   </button>
                 </div>
 
@@ -426,21 +426,21 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                           </span>
                           {complaint.consumer_email && (
                             <span className="email-sent-badge">
-                              📧 Notification sent to {complaint.consumer_email}
+                              Notification sent to {complaint.consumer_email}
                             </span>
                           )}
                           <button className="secondary small-action-btn" onClick={handleCopy}>
-                            {copied ? "✓ Copied!" : "📋 Copy"}
+                            {copied ? "✓ Copied!" : "Copy"}
                           </button>
                           <button className="secondary small-action-btn" onClick={handleDownload}>
-                            📥 Download .txt
+                            Download .txt
                           </button>
                         </div>
                       ) : (
                         <div className="draft-action-group">
                           {isPending && (
                             <div className="pending-notice-box">
-                              <span className="pending-badge">⏳ Pending Approval</span>
+                              <span className="pending-badge">Pending Approval</span>
                               <span className="pending-text">
                                 Submitted by {responseRecord?.requested_by_name || "Agent"} ({responseRecord?.requested_by_role || "agent"}).
                               </span>
@@ -457,8 +457,8 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                                 {approving
                                   ? "Submitting..."
                                   : isPending
-                                  ? "↻ Update & Resubmit Draft"
-                                  : "📤 Submit Draft for Supervisor Approval"}
+                                  ? "Update & Resubmit Draft"
+                                  : "Submit Draft for Supervisor Approval"}
                               </button>
                               <span className="agent-role-hint">
                                 As an Agent, you submit drafts for supervisor sign-off.
