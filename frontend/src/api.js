@@ -137,6 +137,8 @@ export const requestComplaintApproval = (id, response_text) =>
   request(`/complaints/${id}/request-approval`, { method: "POST", body: { response_text } });
 export const approveComplaintResponse = (id, response_text) =>
   request(`/complaints/${id}/approve`, { method: "POST", body: { response_text } });
+export const getPendingApprovals = () =>
+  request("/complaints/pending-approvals");
 export const updateComplaintEmail = (id, consumer_email) =>
   request(`/complaints/${id}/email`, { method: "PUT", body: { consumer_email } });
 export const createComplaint = (data) =>

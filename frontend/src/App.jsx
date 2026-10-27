@@ -4,6 +4,7 @@ import {
   getComplaints,
   getMe,
   getMyRoleUpgradeStatus,
+  getPendingApprovals,
   getProducts,
   getToken,
   requestRoleUpgrade,
@@ -16,6 +17,7 @@ import Trends from "./Trends";
 import UserManagement from "./UserManagement";
 import LandingPage from "./LandingPage";
 import NewComplaint from "./NewComplaint";
+import ApprovalsPortal from "./ApprovalsPortal";
 import {
   IconComplaints,
   IconLogout,
@@ -370,6 +372,7 @@ function App() {
   const [view, setView] = useState("complaints");
   const [authModal, setAuthModal] = useState(null);
   const [directSelectedId, setDirectSelectedId] = useState(null);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [checking, setChecking] = useState(Boolean(getToken()));
   const [profileOpen, setProfileOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -511,6 +514,7 @@ function App() {
   // Background sync: polls every 4 seconds so promotions reflect in true real-time
   useEffect(() => {
     if (!user || isSuperAdminUser(user.email) || user.role === "admin") return;
+
     const interval = setInterval(() => {
       getMe()
         .then((freshUser) => {
@@ -522,6 +526,24 @@ function App() {
         })
         .catch(() => {});
     }, 4000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // Polling pending approval count for supervisors / admins
+  useEffect(() => {
+    if (!user) return;
+    const isSuperCheck = isSuperAdminUser(user.email);
+    const currentEffectiveRole = isSuperCheck ? "admin" : (user.role || "agent");
+    const canApprove = isSuperCheck || ["supervisor", "admin"].includes(currentEffectiveRole);
+    if (!canApprove) return;
+
+    function fetchPendingCount() {
+      getPendingApprovals()
+        .then((res) => setPendingApprovalsCount(res.count || 0))
+        .catch(() => {});
+    }
+    fetchPendingCount();
+    const interval = setInterval(fetchPendingCount, 8000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -585,6 +607,7 @@ function App() {
   const effectiveRole = isSuper ? "admin" : (user.role || "agent");
   const canSeeTrends = isSuper || TREND_ROLES.includes(effectiveRole);
   const canManageUsers = isSuper || ADMIN_ROLES.includes(effectiveRole);
+  const isSupervisorOrAdmin = isSuper || ["supervisor", "admin"].includes(effectiveRole);
   const showTrends = canSeeTrends && view === "trends";
 
   return (
@@ -721,6 +744,17 @@ function App() {
         >
           <IconRules size={16} /> Ask Rules
         </button>
+        {isSupervisorOrAdmin && (
+          <button
+            className={"tab" + (view === "approvals" ? " active" : "")}
+            onClick={() => setView("approvals")}
+          >
+            <IconShield size={16} /> Approvals
+            {pendingApprovalsCount > 0 && (
+              <span className="tab-badge">{pendingApprovalsCount}</span>
+            )}
+          </button>
+        )}
         {canSeeTrends && (
           <button
             className={"tab" + (showTrends ? " active" : "")}
@@ -752,6 +786,14 @@ function App() {
               setDirectSelectedId(null);
               setView("complaints");
             }}
+          />
+        ) : view === "approvals" && isSupervisorOrAdmin ? (
+          <ApprovalsPortal
+            onViewComplaint={(cid) => {
+              setDirectSelectedId(cid);
+              setView("complaints");
+            }}
+            onRefreshCount={(c) => setPendingApprovalsCount(c)}
           />
         ) : showTrends ? (
           <Trends />

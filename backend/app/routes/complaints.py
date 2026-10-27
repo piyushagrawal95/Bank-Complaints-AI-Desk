@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr, Field
 from app.core.config import settings
 from app.db import pool
 from app.deps import get_current_user
-from app.email_service import send_complaint_approval_email
+from app.email_service import send_complaint_approval_email, send_supervisor_approval_request_email
 from app.file_extractor import extract_raw_text, parse_complaint_from_text, extract_complaints_from_file
 from app.llm.analysis import (
     BASIS_METADATA,
@@ -492,13 +492,37 @@ def draft_complaint_reply(complaint_id: int, body: DraftReplyIn | None = None):
     }
 
 
+@router.get("/pending-approvals")
+def list_pending_approvals(user=Depends(get_current_user)):
+    """Lists all complaints with draft responses currently awaiting supervisor approval."""
+    sql = """
+        SELECT 
+            c.complaint_id, c.date_received, c.product, c.issue, c.company,
+            c.state, c.consumer_email, c.narrative,
+            cr.response_text, cr.requested_by_name, cr.requested_by_role,
+            cr.requested_at, cr.status, cr.assigned_to_name, cr.assigned_to_email
+        FROM complaints c
+        JOIN complaint_responses cr ON c.complaint_id = cr.complaint_id
+        WHERE cr.status = 'pending_approval'
+        ORDER BY cr.requested_at DESC NULLS LAST;
+    """
+    try:
+        with pool.connection() as conn:
+            rows = conn.execute(sql).fetchall()
+        return {"count": len(rows), "items": rows}
+    except Exception as exc:
+        logger.exception("Error fetching pending approvals")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch pending approvals: {str(exc)}")
+
+
 @router.post("/{complaint_id}/request-approval")
 def request_approval(
     complaint_id: int,
     body: RequestApprovalIn,
+    request: Request,
     user=Depends(get_current_user),
 ):
-    """Agent action: submits a drafted response for supervisor/admin approval."""
+    """Agent action: submits a drafted response for supervisor/admin approval and notifies supervisors."""
     user_name = user.get("full_name") or user.get("email")
     user_role = user.get("role", "agent")
     user_id = user.get("id")
@@ -522,19 +546,44 @@ def request_approval(
 
     try:
         with pool.connection() as conn:
-            exists = conn.execute("SELECT 1 FROM complaints WHERE complaint_id = %s", [complaint_id]).fetchone()
-            if not exists:
+            complaint = conn.execute(
+                "SELECT company, product, issue FROM complaints WHERE complaint_id = %s",
+                [complaint_id]
+            ).fetchone()
+            if not complaint:
                 raise HTTPException(status_code=404, detail="Complaint not found")
 
             row = conn.execute(
                 sql,
                 [complaint_id, body.response_text, user_id, user_name, user_role],
             ).fetchone()
+
+            supervisors = conn.execute(
+                "SELECT email, full_name FROM users WHERE role IN ('supervisor', 'admin') AND is_active = true"
+            ).fetchall()
     except HTTPException:
         raise
     except Exception:
         logger.exception("Database error while requesting approval")
         raise HTTPException(status_code=503, detail="Database error submitting response for approval.")
+
+    # Dispatch email notification to all active supervisors
+    client_origin = request.headers.get("origin")
+    for sup in supervisors:
+        try:
+            send_supervisor_approval_request_email(
+                to_email=sup["email"],
+                supervisor_name=sup["full_name"],
+                complaint_id=complaint_id,
+                company=complaint.get("company") or "Bank",
+                product=complaint.get("product") or "Service",
+                issue=complaint.get("issue") or "Customer Dispute",
+                agent_name=user_name,
+                response_draft=body.response_text,
+                client_origin=client_origin,
+            )
+        except Exception as mail_err:
+            logger.warning(f"Could not notify supervisor {sup['email']}: {mail_err}")
 
     return row
 

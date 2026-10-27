@@ -300,3 +300,108 @@ def send_complaint_approval_email(
         text_content=text_content,
         client_origin=client_origin,
     )
+
+
+
+def send_supervisor_approval_request_email(
+    to_email: str,
+    supervisor_name: str,
+    complaint_id: int,
+    company: str,
+    product: str,
+    issue: str,
+    agent_name: str,
+    response_draft: str,
+    client_origin: str | None = None,
+) -> bool:
+    """Dispatches a notification email to a supervisor when an agent requests resolution approval."""
+    subject = f"Action Required: Complaint #{complaint_id} Pending Review ({company})"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 24px; }}
+        .card {{ max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }}
+        .badge {{ background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; display: inline-block; text-transform: uppercase; border: 1px solid #bfdbfe; margin-bottom: 12px; }}
+        .title {{ font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 16px; }}
+        .meta-box {{ background: #f8fafc; border-radius: 8px; padding: 16px; margin: 20px 0; font-size: 14px; border: 1px solid #e2e8f0; }}
+        .meta-row {{ display: flex; justify-content: space-between; margin-bottom: 8px; }}
+        .meta-row:last-child {{ margin-bottom: 0; }}
+        .meta-label {{ color: #64748b; font-weight: 500; }}
+        .meta-value {{ color: #0f172a; font-weight: 600; }}
+        .draft-preview {{ background: #f1f5f9; border-left: 4px solid #3b82f6; border-radius: 6px; padding: 16px; color: #1e293b; font-size: 14px; line-height: 1.6; white-space: pre-wrap; margin: 20px 0; }}
+        .footer {{ font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 18px; margin-top: 24px; }}
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <span class="badge">Dispute Review Requested</span>
+        <h1 class="title">Resolution Draft Awaiting Approval</h1>
+        <p>Dear {supervisor_name or 'Supervisor'},</p>
+        <p>Agent <strong>{agent_name}</strong> has submitted an official resolution draft for Complaint <strong>#{complaint_id}</strong>. Please log into the Bank Complaint AI Desk to review, customize if necessary, and formally approve the response.</p>
+        
+        <div class="meta-box">
+          <div class="meta-row">
+            <span class="meta-label">Complaint ID:</span>
+            <span class="meta-value">#{complaint_id}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Bank / Institution:</span>
+            <span class="meta-value">{company}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Product:</span>
+            <span class="meta-value">{product}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Dispute Issue:</span>
+            <span class="meta-value">{issue}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Submitted By:</span>
+            <span class="meta-value">{agent_name}</span>
+          </div>
+        </div>
+
+        <p style="font-weight: 600; font-size: 14px; margin-bottom: 6px;">Draft Resolution Letter Preview:</p>
+        <div class="draft-preview">{response_draft[:800]}...</div>
+
+        <p style="font-size: 14px; color: #475569;">Prompt approval ensures timely delivery to the consumer within mandatory regulatory windows (e.g. Regulation E / Z).</p>
+
+        <div class="footer">
+          <p>Bank Complaint AI Desk &bull; Regulatory Compliance Operations</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+
+    text_content = f"""
+    Dispute Review Request — Complaint #{complaint_id}
+    
+    Dear {supervisor_name or 'Supervisor'},
+    
+    Agent {agent_name} has submitted an official resolution draft for Complaint #{complaint_id} ({company} - {product}) awaiting your review and approval.
+    
+    Dispute Issue: {issue}
+    
+    Draft Preview:
+    --------------------------------------------------
+    {response_draft[:600]}...
+    --------------------------------------------------
+    
+    Please sign into the Bank Complaint AI Desk to review and formally approve this case.
+    
+    Bank Complaint AI Desk - Regulatory Compliance Operations
+    """
+
+    return dispatch_email_transport(
+        to_email=to_email,
+        subject=subject,
+        html_content=html_content,
+        text_content=text_content,
+        client_origin=client_origin,
+    )
