@@ -125,13 +125,40 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
     };
   }, [filters, page]);
 
+  // Debounced live filter synchronization: typing searches live after 350ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters((prev) => {
+        const hasChanged = Object.keys(draft).some((k) => draft[k] !== prev[k]);
+        if (hasChanged) {
+          setPage(1);
+          return { ...draft };
+        }
+        return prev;
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [draft]);
+
   function change(e) {
     const { name, value } = e.target;
-    setDraft((prev) => ({ ...prev, [name]: value }));
+    setDraft((prev) => {
+      const next = { ...prev, [name]: value };
+      // Instant live update on clearing search keyword or changing select
+      if (name === "q" && value.trim() === "") {
+        setFilters((f) => ({ ...f, q: "" }));
+        setPage(1);
+      } else if (name === "product") {
+        setFilters((f) => ({ ...f, product: value }));
+        setPage(1);
+      }
+      return next;
+    });
   }
 
   function applyFilters(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setPage(1);
     setFilters({ ...draft });
   }
@@ -143,7 +170,7 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
   }
 
   const totalPages = data ? data.total_pages : 0;
-  const isFiltered = Object.values(filters).some((v) => v !== "");
+  const isFiltered = Object.values(filters).some((v) => v !== "") || Object.values(draft).some((v) => v !== "");
 
   return (
     <>
@@ -190,6 +217,20 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
             value={draft.q}
             onChange={change}
           />
+          {draft.q && (
+            <button
+              type="button"
+              className="search-clear-btn"
+              onClick={() => {
+                setDraft((prev) => ({ ...prev, q: "" }));
+                setFilters((prev) => ({ ...prev, q: "" }));
+                setPage(1);
+              }}
+              title="Clear search keyword"
+            >
+              ✕
+            </button>
+          )}
         </div>
         <select name="product" value={draft.product} onChange={change}>
           <option value="">All Products</option>

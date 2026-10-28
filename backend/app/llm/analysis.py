@@ -67,7 +67,7 @@ def analyze_narrative(narrative: str) -> dict:
 def build_labels(product, sub_product, issue, sub_issue) -> str:
     """Helper kept for direct label inspection if needed."""
     parts = [
-        ("Product", product),
+        ("Product", product),-
         ("Sub-product", sub_product),
         ("Issue", issue),
         ("Sub-issue", sub_issue),
