@@ -7,6 +7,10 @@ from app.db import pool
 from app.deps import get_current_user
 from app.llm.client import LLMError, chat
 from app.llm.embedding import embed_query
+from app.llm.prompts import (
+    REGULATION_RAG_SYSTEM_PROMPT as SYSTEM_PROMPT,
+    build_regulation_rag_user_prompt,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/regulations", tags=["regulations"], dependencies=[Depends(get_current_user)])
@@ -15,24 +19,6 @@ router = APIRouter(prefix="/regulations", tags=["regulations"], dependencies=[De
 class AskRuleIn(BaseModel):
     question: str = Field(min_length=3, max_length=1000)
     top_k: int = Field(default=4, ge=1, le=10)
-
-
-SYSTEM_PROMPT = """You are an expert banking compliance assistant for a bank's complaint resolution team.
-Your job is to answer compliance questions clearly, authoritatively, and in a highly organized, bulleted structure based on official federal banking regulations.
-
-Formatting & Structure Guidelines:
-1. Core Summary: Begin with a concise 1-2 sentence direct summary stating the governing regulation and section (e.g. Regulation E § 1005.11, Regulation Z § 1026.13, Regulation F § 1006.6, Regulation V § 611).
-2. Structured Bullet Points: Break down the detailed operational rules into clean, categorized bullet points using "• ":
-   - • **Core Timeline & Deadlines:** Exact business days, calendar days, or prohibited hours (e.g., 10 business days, 30 days, 8:00 AM to 9:00 PM).
-   - • **Bank's Obligations:** Specific compliance duties (investigation, provisional credit, written disclosures, fee reversal).
-   - • **Consumer Rights & Protections:** Consumer notification rights, liability limits, and dispute procedures.
-   - • **Exceptions & Extensions (if applicable):** Specific exceptions for new accounts, point-of-sale, or international transactions.
-3. Readability: Bold critical figures and terms (e.g. **10 business days**, **provisional credit**, **Regulation E § 1005.11**). Keep points direct, concise, and scannable.
-4. Grounding: Base your answer strictly on the provided regulation excerpts. Do not invent rules.
-5. Citations: Seamlessly weave regulation names and sections into the text. Do NOT append raw citation brackets like [Source 1] or raw lists of sources at the end.
-6. If the excerpts do not contain enough information to answer, state:
-   "The available regulation documents do not contain specific rules to answer this question."
-"""
 
 
 @router.post("/ask")
@@ -85,12 +71,7 @@ def ask_regulation_rule(body: AskRuleIn):
             "excerpt": c["chunk_text"][:300] + "...",
         })
 
-    user_prompt = (
-        f"Official Regulation Excerpts:\n\n"
-        + "\n\n---\n\n".join(context_blocks)
-        + f"\n\nEmployee Question: {question}\n\n"
-        + "Please provide an efficient, structured answer with a clear summary followed by categorized bullet points highlighting key requirements, timelines, and consumer protections."
-    )
+    user_prompt = build_regulation_rag_user_prompt(question, context_blocks)
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
