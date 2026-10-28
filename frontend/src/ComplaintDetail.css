@@ -113,16 +113,16 @@
 }
 
 .detail-metadata {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.85rem 1.25rem;
   font-size: 0.88rem;
   color: #334155;
   background: #f8fafc;
   padding: 1rem 1.25rem;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .detail-metadata span strong {
@@ -132,9 +132,9 @@
 }
 
 .section-block {
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
   border-top: 1px solid #f1f5f9;
-  padding-top: 1.25rem;
+  padding-top: 1.15rem;
 }
 
 .section-head-row {
@@ -163,6 +163,7 @@
   max-height: 250px;
   overflow-y: auto;
   color: #1e293b;
+  margin: 0.6rem 0 0;
 }
 
 .analysis-box {
@@ -489,7 +490,7 @@
 
 .similar-resolution-box,
 .similar-response {
-  margin-top: auto;
+  margin-top: 0.35rem;
   padding-top: 0.4rem;
   display: flex;
   flex-direction: column;
@@ -635,7 +636,7 @@
 
 /* Consumer Email in Metadata */
 .consumer-email-meta {
-  grid-column: span 2;
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 8px;

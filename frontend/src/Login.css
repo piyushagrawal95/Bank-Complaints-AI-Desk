@@ -240,7 +240,7 @@ input[type="password"]::-ms-clear {
 }
 
 .auth-submit-btn {
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
   width: 100%;
   padding: 0.78rem;
   font-size: 0.95rem;

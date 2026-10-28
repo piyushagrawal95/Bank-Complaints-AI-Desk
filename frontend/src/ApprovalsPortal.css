@@ -255,13 +255,13 @@
 
 .approval-meta-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
   background: #f8fafc;
   padding: 12px 16px;
   border-radius: 8px;
   border: 1px solid #f1f5f9;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .meta-col {
@@ -322,7 +322,7 @@
 }
 
 .resolution-editor-box {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .box-title-row {

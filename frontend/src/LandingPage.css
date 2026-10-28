@@ -133,7 +133,7 @@
 /* HERO SECTION */
 .landing-hero {
   position: relative;
-  padding: 100px 24px 70px;
+  padding: 72px 24px 54px;
   text-align: center;
 }
 
@@ -191,7 +191,7 @@
   line-height: 1.6;
   color: #475569;
   max-width: 740px;
-  margin: 0 auto 38px;
+  margin: 0 auto 28px;
 }
 
 .hero-actions {
@@ -248,7 +248,7 @@
 .section-header {
   text-align: center;
   max-width: 700px;
-  margin: 0 auto 48px;
+  margin: 0 auto 36px;
 }
 
 .section-title {
@@ -269,8 +269,8 @@
 /* FEATURES GRID */
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
 }
 
 .feature-card {

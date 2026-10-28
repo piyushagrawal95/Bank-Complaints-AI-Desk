@@ -33,7 +33,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.25rem;
 }
 
 .stat-card {
@@ -235,7 +235,7 @@
   border-left: 4px solid #f59e0b;
   border-radius: 10px;
   padding: 1.15rem 1.35rem;
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.25rem;
   box-shadow: 0 2px 8px rgba(245, 158, 11, 0.08);
 }
 
@@ -381,7 +381,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 1.25rem 1.5rem;
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.25rem;
 }
 
 .capacity-section-head {
