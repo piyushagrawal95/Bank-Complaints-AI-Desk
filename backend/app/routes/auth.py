@@ -583,7 +583,7 @@ def send_confirmation_email(to_email: str, full_name: str | None = None, client_
     <html>
       <body style="font-family: Arial, sans-serif; color: #1e293b; background: #f8fafc; padding: 20px;">
         <div style="max-width: 520px; margin: 0 auto; background: white; padding: 24px; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.04);">
-          <h2 style="color: #0284c7; margin-top: 0;">🏛️ Bank Complaint AI Desk</h2>
+          <h2 style="color: #0284c7; margin-top: 0;">Bank Complaint AI Desk</h2>
           <p>Hello <strong>{name_display}</strong>,</p>
           <p>Thank you for registering. Please click the button below to verify your email address and activate your banking desk account:</p>
           <p style="text-align: center; margin: 28px 0;">
@@ -612,7 +612,7 @@ def send_password_reset_email(to_email: str, raw_token: str, client_origin: str 
     <html>
       <body style="font-family: Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #f8fafc; padding: 20px;">
         <div style="max-width: 520px; margin: 0 auto; background: white; padding: 24px; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.04);">
-          <h2 style="color: #1e40af; margin-top: 0;">🏛️ Bank Complaint AI Desk</h2>
+          <h2 style="color: #1e40af; margin-top: 0;">Bank Complaint AI Desk</h2>
           <p>Hello,</p>
           <p>We received a request to reset your password. Click the secure link below to set a new password:</p>
           <p style="text-align: center; margin: 28px 0;">
@@ -872,7 +872,7 @@ def request_role_upgrade(body: RoleUpgradeRequestIn, user=Depends(get_current_us
         subject = f"Role Upgrade Request: {user_name} requests {target_role.upper()}"
         html_content = f"""
         <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>🏛️ Bank Complaint AI Desk — Role Upgrade Request</h2>
+            <h2>Bank Complaint AI Desk — Role Upgrade Request</h2>
             <p>User <strong>{user_name}</strong> ({user.get('email')}) has requested promotion:</p>
             <ul>
                 <li><strong>Current Role:</strong> {current_role.upper()}</li>
@@ -981,13 +981,13 @@ def approve_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
                 target_email = user_info["email"]
                 user_name = user_info.get("full_name") or target_email.split("@")[0]
                 admin_name = admin.get("full_name") or admin.get("email", "Admin")
-                subject = f"🎉 Role Upgrade Approved: Welcome to {new_role.upper()}"
+                subject = f"Role Upgrade Approved: Welcome to {new_role.upper()}"
                 html_content = f"""
                 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
                     <div style="background: #1e3a8a; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
                         <h2 style="color: #ffffff; margin: 0; font-size: 20px;">Bank Complaint AI Desk</h2>
                     </div>
-                    <h3 style="color: #0f172a; margin-top: 0;">🎉 Congratulations, {user_name}!</h3>
+                    <h3 style="color: #0f172a; margin-top: 0;">Congratulations, {user_name}!</h3>
                     <p style="color: #334155; font-size: 15px; line-height: 1.5;">
                         Your request to be promoted to <strong>{new_role.upper()}</strong> has been reviewed and <strong style="color: #16a34a;">APPROVED</strong> by administrator ({admin_name}).
                     </p>

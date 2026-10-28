@@ -305,7 +305,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
             const htmlContent = `
               <div style="font-family: Arial, sans-serif; color: #1e293b; background: #f8fafc; padding: 20px;">
                 <div style="max-width: 520px; margin: 0 auto; background: white; padding: 24px; border-radius: 10px; border: 1px solid #e2e8f0;">
-                  <h2 style="color: #0284c7; margin-top: 0;">🏛️ Bank Complaint AI Desk</h2>
+                  <h2 style="color: #0284c7; margin-top: 0;">Bank Complaint AI Desk</h2>
                   <p>Hello <strong>${fullName || "Bank Associate"}</strong>,</p>
                   <p>Thank you for registering. Please click the button below to verify your email address and activate your banking desk account:</p>
                   <p style="text-align: center; margin: 28px 0;">

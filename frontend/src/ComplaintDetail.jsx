@@ -8,7 +8,16 @@ import {
   requestComplaintApproval,
   updateComplaintEmail,
 } from "./api";
-import { IconCheck, IconSparkles, IconSearch } from "./Icons";
+import {
+  IconAlert,
+  IconBuilding,
+  IconCalendar,
+  IconCheck,
+  IconEdit,
+  IconMail,
+  IconSearch,
+  IconSparkles,
+} from "./Icons";
 import "./ComplaintDetail.css";
 
 function ComplaintDetail({ id, currentUser, onClose }) {
@@ -285,7 +294,7 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                   ) : (
                     <span>
                       {complaint.consumer_email ? (
-                        <span className="email-chip">✉ {complaint.consumer_email}</span>
+                        <span className="email-chip"><IconMail size={12} /> {complaint.consumer_email}</span>
                       ) : (
                         <span className="email-empty">(No email recorded)</span>
                       )}
@@ -296,7 +305,7 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                           setIsEditingEmail(true);
                         }}
                       >
-                        ✏️ {complaint.consumer_email ? "Edit" : "+ Add Email"}
+                        {complaint.consumer_email ? "Edit" : "+ Add Email"}
                       </button>
                     </span>
                   )}
@@ -402,10 +411,12 @@ function ComplaintDetail({ id, currentUser, onClose }) {
 
                           <div className="similar-card-sub">
                             <span className="similar-bank" title={c.company || "Bank"}>
-                              🏢 {c.company || "Financial Institution"}
+                              <IconBuilding size={13} style={{ verticalAlign: "middle", marginRight: 3 }} />
+                              {c.company || "Financial Institution"}
                             </span>
                             <span className="similar-date">
-                              📅 {c.date_received || "N/A"}
+                              <IconCalendar size={13} style={{ verticalAlign: "middle", marginRight: 3 }} />
+                              {c.date_received || "N/A"}
                             </span>
                           </div>
 
@@ -457,7 +468,7 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                 {isRejected && (
                   <div className="supervisor-rejection-banner">
                     <div className="rejection-banner-head">
-                      <span className="rejection-icon">⚠️</span>
+                      <span className="rejection-icon"><IconAlert size={16} /></span>
                       <strong>Revisions Requested by {responseRecord?.rejected_by_name || "Supervisor"}</strong>
                       {responseRecord?.rejected_at && (
                         <span className="rejection-date">{new Date(responseRecord.rejected_at).toLocaleString()}</span>

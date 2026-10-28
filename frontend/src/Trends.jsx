@@ -138,14 +138,14 @@ function Trends() {
           className={`mode-tab ${timelineMode === "presets" ? "active" : ""}`}
           onClick={() => setTimelineMode("presets")}
         >
-          ⚡ Rolling Days Window
+          Rolling Days Window
         </button>
         <button
           type="button"
           className={`mode-tab ${timelineMode === "range" ? "active" : ""}`}
           onClick={() => setTimelineMode("range")}
         >
-          📅 Custom Date Range (From – To)
+          Custom Date Range (From – To)
         </button>
       </div>
 
@@ -204,7 +204,7 @@ function Trends() {
                 />
               </div>
 
-              <div className="date-range-arrow">➔</div>
+              <div className="date-range-arrow">→</div>
 
               <div className="date-field-group">
                 <label htmlFor="range-to">End Date (To):</label>
@@ -244,7 +244,7 @@ function Trends() {
           {timelineMode === "presets" && (
             <div className="secondary-control-item">
               <label htmlFor="as-of-date">
-                📅 End Date (As Of):
+                End Date (As Of):
               </label>
               <div className="as-of-input-wrapper">
                 <input
@@ -272,7 +272,7 @@ function Trends() {
 
           <div className="secondary-control-item">
             <label htmlFor="spike-threshold">
-              ⚡ Spike Threshold:
+              Spike Threshold:
             </label>
             <select
               id="spike-threshold"
@@ -287,7 +287,7 @@ function Trends() {
 
           <div className="secondary-control-item">
             <label htmlFor="min-count">
-              🔢 Min Volume:
+              Min Volume:
             </label>
             <select
               id="min-count"

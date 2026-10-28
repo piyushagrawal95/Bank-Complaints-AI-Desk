@@ -19,12 +19,17 @@ import LandingPage from "./LandingPage";
 import NewComplaint from "./NewComplaint";
 import ApprovalsPortal from "./ApprovalsPortal";
 import {
+  IconAlert,
+  IconCheck,
+  IconClock,
   IconComplaints,
   IconLogout,
+  IconMail,
   IconRules,
   IconSearch,
   IconShield,
   IconTrends,
+  IconUser,
   IconUsers,
 } from "./Icons";
 
@@ -67,16 +72,16 @@ function getProductCategory(product = "") {
 function renderResponseBadge(resp = "") {
   const r = (resp || "").toLowerCase();
   if (r.includes("monetary relief") && !r.includes("non-monetary")) {
-    return <span className="response-pill resp-monetary">💰 Monetary Relief</span>;
+    return <span className="response-pill resp-monetary">Monetary Relief</span>;
   }
   if (r.includes("non-monetary")) {
-    return <span className="response-pill resp-nonmonetary">⚖️ Non-monetary</span>;
+    return <span className="response-pill resp-nonmonetary">Non-monetary Relief</span>;
   }
   if (r.includes("explanation")) {
-    return <span className="response-pill resp-explanation">📄 Explanation</span>;
+    return <span className="response-pill resp-explanation">Explanation</span>;
   }
   if (r.includes("progress")) {
-    return <span className="response-pill resp-progress">⏳ In Progress</span>;
+    return <span className="response-pill resp-progress">In Progress</span>;
   }
   return <span className="response-pill resp-default">{resp || "Under Review"}</span>;
 }
@@ -304,7 +309,7 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
                             )}
                             {c.consumer_email && (
                               <span className="email-table-tag" title={c.consumer_email}>
-                                ✉ {c.consumer_email}
+                                <IconMail size={12} /> {c.consumer_email}
                               </span>
                             )}
                           </div>
@@ -330,7 +335,7 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
                             ) : c.timely_response ? (
                               <span className="timely-pill timely-yes">✓ Yes</span>
                             ) : (
-                              <span className="timely-pill timely-no">✗ No</span>
+                              <span className="timely-pill timely-no">✕ No</span>
                             )}
                           </span>
                         </td>
@@ -520,7 +525,7 @@ function App() {
         .then((freshUser) => {
           if (freshUser && freshUser.role && freshUser.role !== user.role) {
             setUser(freshUser);
-            setLivePromotionNotice(`🎉 Congratulations! Your promotion to ${freshUser.role.toUpperCase()} was approved by Admin!`);
+            setLivePromotionNotice(`Promotion Notice: Your promotion to ${freshUser.role.toUpperCase()} was approved by Admin.`);
             getMyRoleUpgradeStatus().then(setUpgradeStatus).catch(() => {});
           }
         })
@@ -615,7 +620,7 @@ function App() {
       {livePromotionNotice && (
         <div className="live-promotion-toast">
           <div className="live-toast-content">
-            <span className="live-toast-icon">🎉</span>
+            <span className="live-toast-icon"><IconCheck size={16} /></span>
             <span className="live-toast-text">{livePromotionNotice}</span>
           </div>
           <button className="live-toast-close" onClick={() => setLivePromotionNotice(null)}>✕</button>
@@ -649,7 +654,7 @@ function App() {
               <div className="user-details">
                 <span className="user-name">{user.full_name || user.email}</span>
                 <span className={`badge badge-${effectiveRole}`}>
-                  {isSuper ? "👑 Super Admin" : effectiveRole}
+                  {isSuper ? "Super Admin" : effectiveRole}
                 </span>
               </div>
               <span className="dropdown-caret">▾</span>
@@ -682,7 +687,7 @@ function App() {
                       setShowProfileModal(true);
                     }}
                   >
-                    <span className="menu-item-icon">👤</span>
+                    <IconUser size={15} />
                     <span>My Profile & Details</span>
                   </button>
 
@@ -696,7 +701,7 @@ function App() {
                         setView("users");
                       }}
                     >
-                      <span className="menu-item-icon">👥</span>
+                      <IconUsers size={15} />
                       <span>User Management Portal</span>
                     </button>
                   )}
@@ -838,7 +843,7 @@ function App() {
                 <span className="profile-val">
                   <span className={`badge badge-${effectiveRole}`}>
                     {isSuper
-                      ? "👑 Permanent Super Admin"
+                      ? "Permanent Super Admin"
                       : effectiveRole.toUpperCase()}
                   </span>
                 </span>
@@ -861,7 +866,7 @@ function App() {
                 {upgradeStatus?.has_pending ? (
                   <div className="upgrade-pending-card">
                     <div className="upgrade-pending-title">
-                      <span>⏳</span>
+                      <IconClock size={16} />
                       <strong>Promotion Request Pending Admin Review</strong>
                     </div>
                     <div className="upgrade-pending-details">
@@ -880,8 +885,8 @@ function App() {
                       <div className="upgrade-approved-card">
                         <div className="upgrade-approved-title">
                           <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
-                            <span>🎉</span>
-                            <strong>Promotion Approved by Admin!</strong>
+                            <IconCheck size={16} />
+                            <strong>Promotion Approved by Administrator</strong>
                           </span>
                           <button
                             type="button"
@@ -900,7 +905,7 @@ function App() {
                     {!upgradeStatus?.has_pending && upgradeStatus?.request?.status === "rejected" && (
                       <div className="upgrade-rejected-card">
                         <div className="upgrade-rejected-title">
-                          <span>ℹ️</span>
+                          <IconAlert size={16} />
                           <strong>Promotion Request Update</strong>
                         </div>
                         <div className="upgrade-rejected-details">
@@ -920,7 +925,7 @@ function App() {
                             setUpgradeMessage(null);
                           }}
                         >
-                          <span>📢</span> Request Role Upgrade to {effectiveRole === "supervisor" ? "Admin" : "Supervisor / Admin"}
+                          Request Role Upgrade to {effectiveRole === "supervisor" ? "Admin" : "Supervisor / Admin"}
                         </button>
                       </div>
                     ) : (

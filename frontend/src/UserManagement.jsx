@@ -8,6 +8,7 @@ import {
   rejectRoleUpgrade,
   updateUserRole,
 } from "./api";
+import { IconClock, IconLock } from "./Icons";
 import "./UserManagement.css";
 
 const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || "piyushagrawal300504@gmail.com").toLowerCase();
@@ -180,7 +181,7 @@ function UserManagement({ currentUser }) {
       {pendingUpgrades.length > 0 && (
         <div className="pending-upgrades-banner">
           <div className="pending-upgrades-head">
-            <span className="pending-badge-icon">🔔</span>
+            <span className="pending-badge-icon"><IconClock size={16} /></span>
             <h3>Pending Role Upgrade Requests ({pendingUpgrades.length})</h3>
           </div>
           <div className="pending-upgrades-list">
@@ -192,7 +193,7 @@ function UserManagement({ currentUser }) {
                   </div>
                   <div className="upgrade-role-flow">
                     <span className={`role-badge role-${req.from_role}`}>{req.from_role}</span>
-                    <span className="flow-arrow">➔</span>
+                    <span className="flow-arrow">→</span>
                     <span className={`role-badge role-${req.to_role}`} style={{ fontWeight: 700 }}>
                       {req.to_role.toUpperCase()}
                     </span>
@@ -317,7 +318,7 @@ function UserManagement({ currentUser }) {
                       {isCurrent && <span className="you-pill">You</span>}
                       {isSuperAdminUser(u.email) && (
                         <span className="root-admin-pill" title="System Founder & Permanent Root Administrator">
-                          👑 Owner
+                          Owner
                         </span>
                       )}
                     </td>
@@ -328,7 +329,7 @@ function UserManagement({ currentUser }) {
                       <span className={`role-badge role-${u.role}`}>{u.role}</span>
                       {userPendingReq && (
                         <span className="pending-upgrade-indicator" title={`Requested elevation to ${userPendingReq.to_role.toUpperCase()}`}>
-                          ⏳ Req: {userPendingReq.to_role.toUpperCase()}
+                          Req: {userPendingReq.to_role.toUpperCase()}
                         </span>
                       )}
                     </td>
@@ -377,7 +378,7 @@ function UserManagement({ currentUser }) {
                     <td>
                       {isSuperAdminUser(u.email) ? (
                         <span className="super-admin-lock-tag" title="Root Super Admin (Role is permanently locked)">
-                          🔒 Permanent Admin
+                          <IconLock size={12} style={{ verticalAlign: "middle", marginRight: 3 }} /> Permanent Admin
                         </span>
                       ) : (
                         <div className="role-change-wrapper">

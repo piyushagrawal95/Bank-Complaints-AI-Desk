@@ -106,3 +106,79 @@ export function IconAlert({ size = 16, className = "" }) {
   );
 }
 
+export function IconMail({ size = 14, className = "" }) {
+  return (
+    <svg {...common} width={size} height={size} className={className}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </svg>
+  );
+}
+
+export function IconCalendar({ size = 14, className = "" }) {
+  return (
+    <svg {...common} width={size} height={size} className={className}>
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+export function IconBuilding({ size = 14, className = "" }) {
+  return (
+    <svg {...common} width={size} height={size} className={className}>
+      <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+      <path d="M9 22v-4h6v4" />
+      <path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01" />
+    </svg>
+  );
+}
+
+export function IconClock({ size = 14, className = "" }) {
+  return (
+    <svg {...common} width={size} height={size} className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+export function IconEdit({ size = 14, className = "" }) {
+  return (
+    <svg {...common} width={size} height={size} className={className}>
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+export function IconCopy({ size = 14, className = "" }) {
+  return (
+    <svg {...common} width={size} height={size} className={className}>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+export function IconLock({ size = 14, className = "" }) {
+  return (
+    <svg {...common} width={size} height={size} className={className}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+export function IconUser({ size = 14, className = "" }) {
+  return (
+    <svg {...common} width={size} height={size} className={className}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+

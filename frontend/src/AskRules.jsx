@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { askRule } from "./api";
+import { IconCheck, IconCopy, IconRules } from "./Icons";
 import "./AskRules.css";
 
 const QUICK_QUESTIONS = [
@@ -91,7 +92,7 @@ function FormattedComplianceAnswer({ answer }) {
           return (
             <div key={idx} className="answer-summary-box">
               <div className="summary-badge-title">
-                <span className="summary-icon">⚖️</span> Key Regulatory Mandate
+                <span className="summary-icon"><IconRules size={14} /></span> Key Regulatory Mandate
               </div>
               <p className="summary-text-lead">{renderFormattedInline(cleanIntro)}</p>
             </div>
@@ -250,7 +251,17 @@ function AskRules() {
                 onClick={copyAnswerToClipboard}
                 title="Copy answer text to clipboard"
               >
-                {copied ? "✓ Copied!" : "📋 Copy Answer"}
+                {copied ? (
+                  <>
+                    <IconCheck size={14} />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <IconCopy size={14} />
+                    <span>Copy Answer</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

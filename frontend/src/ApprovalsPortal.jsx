@@ -251,7 +251,7 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
                     />
                     {!currentEmail && (
                       <span className="no-email-hint">
-                        ⚠️ No email provided. You can type a customer email above, or approve as letter-only.
+                        Notice: No customer email on file. You can enter an email address above to dispatch notice, or approve as letter-only.
                       </span>
                     )}
                   </div>
@@ -274,7 +274,7 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
                   {isRejecting && (
                     <div className="rejection-panel">
                       <div className="rejection-panel-head">
-                        <span className="rejection-panel-title">⚠️ Rejection Reason & Revision Instructions for Agent:</span>
+                        <span className="rejection-panel-title">Rejection Reason & Revision Instructions for Agent:</span>
                         <span className="rejection-panel-sub">Agent will be notified and can edit & re-submit</span>
                       </div>
                       <textarea
