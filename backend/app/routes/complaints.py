@@ -185,6 +185,13 @@ def create_complaint(body: CreateComplaintIn, user: dict = Depends(get_current_u
 
     try:
         with pool.connection() as conn:
+            if clean_email:
+                existing=conn.execute("select complaint_id from complaints where consumer_email=%s AND company=%s and issue=%s LIMIT 1",[clean_email,body.company.strip(),body.issue.strip()],).fetchone()
+                if existing:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"This complaint already exists in database with ID #{existing['complaint_id']}"
+                    )
             # Generate next unique complaint_id
             max_row = conn.execute("SELECT COALESCE(MAX(complaint_id), 10000000) AS max_id FROM complaints").fetchone()
             new_id = int(max_row["max_id"]) + 1
@@ -420,6 +427,8 @@ def batch_create_complaints(
         raise HTTPException(status_code=400, detail="Batch exceeds maximum limit of 200 complaints per upload.")
 
     created_list = []
+    skipped_duplicates = []
+    created_pairs = []
     try:
         with pool.connection() as conn:
             # Find current max complaint_id
@@ -440,9 +449,27 @@ def batch_create_complaints(
             """
 
             for item in body.complaints:
+                clean_email = (item.consumer_email or "").strip().lower() or None
+                comp_name = item.company.strip() if item.company else ""
+                issue_name = item.issue.strip() if item.issue else ""
+
+                # Duplicate check: agar same email, company, and issue already database me hai toh skip karo
+                if clean_email and comp_name and issue_name:
+                    existing = conn.execute(
+                        "SELECT complaint_id FROM complaints WHERE consumer_email = %s AND company = %s AND issue = %s LIMIT 1",
+                        [clean_email, comp_name, issue_name],
+                    ).fetchone()
+                    if existing:
+                        skipped_duplicates.append({
+                            "existing_id": existing["complaint_id"],
+                            "company": comp_name,
+                            "issue": issue_name,
+                            "email": clean_email,
+                        })
+                        continue
+
                 current_id += 1
                 date_rcvd = item.date_received or date.today()
-                clean_email = (item.consumer_email or "").strip().lower() or None
                 clean_state = (item.state or "").strip().upper() or "NY"
                 clean_zip = (item.zip_code or "").strip() or None
 
@@ -453,10 +480,10 @@ def batch_create_complaints(
                         date_rcvd,
                         item.product.strip() if item.product else "Checking or savings account",
                         item.sub_product.strip() if item.sub_product else None,
-                        item.issue.strip() if item.issue else "Dispute reported",
+                        issue_name or "Dispute reported",
                         item.sub_issue.strip() if item.sub_issue else None,
                         item.narrative.strip() if item.narrative else "Customer dispute details submitted via batch file.",
-                        item.company.strip() if item.company else "JPMorgan Chase & Co.",
+                        comp_name or "JPMorgan Chase & Co.",
                         clean_state,
                         clean_zip,
                         "Bulk File Upload",
@@ -465,21 +492,30 @@ def batch_create_complaints(
                     ],
                 ).fetchone()
                 created_list.append(row)
+                created_pairs.append((row, item))
+
             conn.commit()
 
-            # Schedule background generation of vector embeddings for all batch complaints
+            # Schedule background generation of vector embeddings for all newly created complaints
             background_items = [
                 {
                     "complaint_id": r["complaint_id"],
                     "product": r["product"],
                     "issue": r["issue"],
-                    "narrative": item.narrative or "",
+                    "narrative": itm.narrative or "",
                 }
-                for r, item in zip(created_list, body.complaints)
+                for r, itm in created_pairs
             ]
-            background_tasks.add_task(generate_batch_embeddings_task, background_items)
+            if background_items:
+                background_tasks.add_task(generate_batch_embeddings_task, background_items)
 
-        return {"success": True, "count": len(created_list), "complaints": created_list}
+        return {
+            "success": True,
+            "count": len(created_list),
+            "skipped_count": len(skipped_duplicates),
+            "complaints": created_list,
+            "duplicates": skipped_duplicates,
+        }
     except Exception as exc:
         logger.exception("Error in batch complaint creation")
         raise HTTPException(status_code=500, detail=f"Failed to batch create complaints: {str(exc)}")

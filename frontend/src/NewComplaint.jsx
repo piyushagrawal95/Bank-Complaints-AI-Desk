@@ -117,6 +117,8 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
       setBatchSuccess({
         filename: batchData.filename,
         count: res.count,
+        skipped_count: res.skipped_count || 0,
+        duplicates: res.duplicates || [],
         complaints: res.complaints || [],
       });
       setBatchData(null);
@@ -207,35 +209,75 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
           <div className="success-icon-ring">
             <IconCheck size={32} />
           </div>
-          <h3>Batch Ingestion Completed Successfully!</h3>
+          <h3>
+            {batchSuccess.count > 0
+              ? "Batch Ingestion Completed Successfully!"
+              : "Batch Ingestion Completed (All Duplicates)"}
+          </h3>
           <p className="success-lead">
-            <strong>{batchSuccess.count} complaint records</strong> from <strong>{batchSuccess.filename}</strong> have been indexed and saved in the database.
+            {batchSuccess.count > 0 ? (
+              <>
+                <strong>{batchSuccess.count} complaint records</strong> from <strong>{batchSuccess.filename}</strong> have been indexed and saved in the database.
+              </>
+            ) : (
+              <>
+                All records from <strong>{batchSuccess.filename}</strong> already exist in the database.
+              </>
+            )}
           </p>
 
-          <div className="batch-preview-table-card">
-            <table className="batch-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Bank / Entity</th>
-                  <th>Product Vertical</th>
-                  <th>Primary Issue</th>
-                  <th>Consumer Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batchSuccess.complaints.map((c, i) => (
-                  <tr key={c.complaint_id || i}>
-                    <td><strong className="complaint-id-link">#{c.complaint_id}</strong></td>
-                    <td>{c.company}</td>
-                    <td>{c.product}</td>
-                    <td>{c.issue}</td>
-                    <td>{c.consumer_email || "Not specified"}</td>
+          {batchSuccess.skipped_count > 0 && (
+            <div
+              style={{
+                background: "#fffbeb",
+                border: "1px solid #fcd34d",
+                borderRadius: "10px",
+                padding: "12px 16px",
+                margin: "14px 0 18px",
+                color: "#92400e",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                fontSize: "14px",
+                lineHeight: "1.5",
+              }}
+            >
+              <span style={{ fontSize: "18px" }}>⚠️</span>
+              <div>
+                <strong>{batchSuccess.skipped_count} complaint(s) already existed:</strong> They were skipped to prevent duplicate entries.
+                {batchSuccess.count > 0
+                  ? ` ${batchSuccess.count} new unique records were added successfully.`
+                  : " No new complaints were added."}
+              </div>
+            </div>
+          )}
+
+          {batchSuccess.complaints && batchSuccess.complaints.length > 0 && (
+            <div className="batch-preview-table-card">
+              <table className="batch-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Bank / Entity</th>
+                    <th>Product Vertical</th>
+                    <th>Primary Issue</th>
+                    <th>Consumer Email</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {batchSuccess.complaints.map((c, i) => (
+                    <tr key={c.complaint_id || i}>
+                      <td><strong className="complaint-id-link">#{c.complaint_id}</strong></td>
+                      <td>{c.company}</td>
+                      <td>{c.product}</td>
+                      <td>{c.issue}</td>
+                      <td>{c.consumer_email || "Not specified"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div className="success-actions" style={{ marginTop: "24px" }}>
             <button className="btn-primary" onClick={onGoToComplaints}>
