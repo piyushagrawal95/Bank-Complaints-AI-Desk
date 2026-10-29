@@ -48,6 +48,23 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
   const turnstileRef = useRef(null);
   const widgetIdRef = useRef(null);
 
+  // Progressive feedback for cloud server cold starts
+  useEffect(() => {
+    let t1, t2;
+    if (loading) {
+      t1 = setTimeout(() => {
+        setLoadingMessage((prev) => `${prev || "Connecting"} (Waking up cloud server...)`);
+      }, 4500);
+      t2 = setTimeout(() => {
+        setLoadingMessage("Cloud server is spinning up from idle (cold start). Please hold on...");
+      }, 11000);
+    }
+    return () => {
+      if (t1) clearTimeout(t1);
+      if (t2) clearTimeout(t2);
+    };
+  }, [loading]);
+
   function resetTurnstile() {
     setTurnstileToken("");
     if (widgetIdRef.current !== null && window.turnstile) {

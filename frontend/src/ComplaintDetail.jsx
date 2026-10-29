@@ -357,7 +357,24 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                     {analyzing ? "Analyzing with AI..." : (<><IconSparkles size={15} /> Analyze with AI</>)}
                   </button>
                 )}
-                {analyzeError && <div className="error">{analyzeError}</div>}
+                {analyzeError && (
+                  <div className="server-error-banner" style={{ margin: "0.8rem 0" }}>
+                    <div className="server-error-left">
+                      <span className="server-error-icon">⚠️</span>
+                      <div>
+                        <div className="server-error-title">AI Engine Unavailable</div>
+                        <div className="server-error-msg">{analyzeError}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-retry-modern"
+                      onClick={() => runAnalysis(true)}
+                    >
+                      🔄 Retry
+                    </button>
+                  </div>
+                )}
               </section>
 
               {/* Similar Past Complaints */}

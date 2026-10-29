@@ -156,9 +156,23 @@ function AskRules() {
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingSecs, setLoadingSecs] = useState(0);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [showCitations, setShowCitations] = useState(false);
+
+  useEffect(() => {
+    let interval = null;
+    if (loading) {
+      setLoadingSecs(0);
+      interval = setInterval(() => setLoadingSecs((s) => s + 1), 1000);
+    } else {
+      setLoadingSecs(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [loading]);
 
   async function handleAsk(qToAsk) {
     const q = qToAsk || question;
@@ -249,11 +263,37 @@ function AskRules() {
       {loading && (
         <div className="loading-card">
           <div className="loading-pulse"></div>
-          <p className="info">Searching official federal banking regulations (12 CFR)...</p>
+          <p className="info">
+            {loadingSecs < 4
+              ? "Searching official federal banking regulations (12 CFR)..."
+              : loadingSecs < 12
+              ? `Synthesizing compliance rules with Groq LLM (${loadingSecs}s)...`
+              : `Finalizing regulatory synthesis (${loadingSecs}s)... please wait`}
+          </p>
         </div>
       )}
 
-      {error && <div className="error">Error retrieving compliance rule: {error}</div>}
+      {error && (
+        <div className="server-error-banner">
+          <div className="server-error-left">
+            <span className="server-error-icon">⚠️</span>
+            <div>
+              <div className="server-error-title">Compliance Assistant Unavailable</div>
+              <div className="server-error-msg">{error}</div>
+              <div className="server-error-sub">
+                If the cloud instance is waking up, please wait a moment and retry.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-retry-modern"
+            onClick={() => handleAsk()}
+          >
+            🔄 Try Again
+          </button>
+        </div>
+      )}
 
       {result && (
         <div className="result-card">

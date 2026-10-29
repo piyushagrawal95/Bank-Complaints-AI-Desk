@@ -19,7 +19,7 @@ export function setUnauthorizedHandler(fn) {
   onUnauthorized = fn;
 }
 
-async function request(path, { method = "GET", params = {}, body } = {}) {
+async function request(path, { method = "GET", params = {}, body, timeout } = {}) {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== "" && value !== null && value !== undefined) {
@@ -38,15 +38,44 @@ async function request(path, { method = "GET", params = {}, body } = {}) {
     headers["Content-Type"] = "application/json";
   }
 
+  // Smart timeout: Give AI & batch operations up to 55s; standard queries 22s
+  const defaultTimeout =
+    path.includes("/analysis") ||
+    path.includes("/draft-reply") ||
+    path.includes("/ask") ||
+    path.includes("/batch-create") ||
+    path.includes("/extract-file")
+      ? 55000
+      : 22000;
+
+  const timeoutMs = timeout || defaultTimeout;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   let response;
   try {
-    const fetchOptions = { method, headers };
+    const fetchOptions = { method, headers, signal: controller.signal };
     if (body !== undefined) {
       fetchOptions.body = JSON.stringify(body);
     }
     response = await fetch(url, fetchOptions);
-  } catch {
-    throw new Error("Cannot reach the backend server. Please verify it is running on port 8000.");
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") {
+      throw new Error(
+        "Request timed out. The cloud server may be waking up from idle mode (cold start). Please click Retry."
+      );
+    }
+    const isLocal = API_URL.includes("localhost") || API_URL.includes("127.0.0.1");
+    if (isLocal) {
+      throw new Error("Cannot reach local backend server. Please verify uvicorn is running on port 8000.");
+    } else {
+      throw new Error(
+        "Cannot connect to the backend server. The cloud service may be waking up or temporarily unavailable. Please retry in a moment."
+      );
+    }
+  } finally {
+    clearTimeout(timer);
   }
 
   if (!response.ok) {
@@ -175,11 +204,26 @@ export async function extractComplaintFile(file) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}/complaints/extract-file`, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 55000);
+
+  let res;
+  try {
+    res = await fetch(`${API_URL}/complaints/extract-file`, {
+      method: "POST",
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") {
+      throw new Error("Document parsing timed out. Cloud server may be waking up. Please retry.");
+    }
+    throw new Error("Failed to reach server for document extraction. Please retry.");
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     let msg = `Extraction failed (${res.status})`;

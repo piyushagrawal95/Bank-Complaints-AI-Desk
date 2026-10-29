@@ -93,8 +93,23 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
   const [products, setProducts] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingSecs, setLoadingSecs] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(initialSelectedId);
+
+  useEffect(() => {
+    let interval = null;
+    if (loading) {
+      setLoadingSecs(0);
+      interval = setInterval(() => setLoadingSecs((s) => s + 1), 1000);
+    } else {
+      setLoadingSecs(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [loading]);
 
   useEffect(() => {
     if (initialSelectedId) {
@@ -104,7 +119,7 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
 
   useEffect(() => {
     getProducts().then(setProducts).catch(() => setProducts([]));
-  }, []);
+  }, [retryCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +138,7 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
     return () => {
       cancelled = true;
     };
-  }, [filters, page]);
+  }, [filters, page, retryCount]);
 
   // Debounced live filter synchronization: typing searches live after 350ms
   useEffect(() => {
@@ -282,11 +297,37 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
         />
       )}
 
-      {error && <div className="error">Could not load complaints: {error}</div>}
+      {error && (
+        <div className="server-error-banner">
+          <div className="server-error-left">
+            <span className="server-error-icon">⚠️</span>
+            <div>
+              <div className="server-error-title">Backend Connection Issue</div>
+              <div className="server-error-msg">{error}</div>
+              <div className="server-error-sub">
+                If the cloud backend was inactive, it may take 40-50 seconds to wake up. Click retry to reconnect.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-retry-modern"
+            onClick={() => setRetryCount((c) => c + 1)}
+          >
+            🔄 Retry Connection
+          </button>
+        </div>
+      )}
       {loading && (
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "1rem 0", color: "#0284c7" }}>
           <div className="inline-spinner"></div>
-          <span style={{ fontSize: "0.92rem", fontWeight: 500 }}>Loading complaint records from database...</span>
+          <span style={{ fontSize: "0.92rem", fontWeight: 500 }}>
+            {loadingSecs < 4
+              ? "Loading complaint records from database..."
+              : loadingSecs < 12
+              ? `Connecting to cloud backend (${loadingSecs}s)... waking up instance`
+              : `Still connecting to backend (${loadingSecs}s)... please wait, instance is spinning up`}
+          </span>
         </div>
       )}
 

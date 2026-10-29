@@ -1147,6 +1147,81 @@ tr.clickable:hover {
   font-size: 0.88rem;
 }
 
+/* SERVER CONNECTION RESILIENCE & RETRY BANNER */
+.server-error-banner {
+  background: #fff1f2;
+  border: 1.5px solid #fecdd3;
+  border-radius: 10px;
+  padding: 0.95rem 1.25rem;
+  margin: 1rem 0 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.05);
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+.server-error-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  color: #9f1239;
+  flex: 1;
+}
+
+.server-error-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.server-error-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  margin-bottom: 0.15rem;
+  color: #881337;
+}
+
+.server-error-msg {
+  font-size: 0.86rem;
+  color: #4c0519;
+  line-height: 1.45;
+}
+
+.server-error-sub {
+  font-size: 0.78rem;
+  color: #9f1239;
+  margin-top: 0.25rem;
+  opacity: 0.9;
+}
+
+.btn-retry-modern {
+  background: #ffffff;
+  color: #e11d48;
+  border: 1.5px solid #fda4af;
+  padding: 0.45rem 0.95rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-retry-modern:hover {
+  background: #ffe4e6;
+  border-color: #f43f5e;
+  color: #be123c;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.15);
+}
+
 /* GLOBAL SPINNERS */
 @keyframes spin {
   0% { transform: rotate(0deg); }
