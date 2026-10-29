@@ -37,21 +37,43 @@ function FormattedComplianceAnswer({ answer }) {
   };
 
   rawLines.forEach((line) => {
-    // Check if line is a bullet: starts with •, -, *, or digits like 1., 2.
-    const isBullet = /^([•\-*]|\d+\.)\s+/.test(line);
-    // Check if heading: ### Header or Title:
-    const isHeading = /^#{1,4}\s+/.test(line) || (line.endsWith(":") && line.length < 60 && !isBullet);
+    // 1. Detect if line is a Heading (Markdown ###, bold section title, or bulleted category header)
+    const isMarkdownHeading = /^#{1,4}\s+/.test(line);
+    const isBoldHeaderLine = /^(\*{2})[^*:]+:\*{2}\s*$/.test(line) || /^(\*{2})[^*]+\*{2}\s*:?\s*$/.test(line);
+    const isBulletHeader = /^([•\-*]|\d+\.)\s*\*\*([^*]+)\*\*:\s*$/.test(line);
+    const isCategoryHeader =
+      /^([•\-*]|\d+\.)\s*(Core Summary|Core Timeline|Timeline & Deadlines|Bank['’]s Obligations|Consumer Rights|Exceptions|Regulatory Requirements|Key Provisions|Mandatory Disclosures|Dispute Procedures)\b/i.test(
+        line
+      ) && !line.includes(". ");
 
-    if (isBullet) {
-      const cleanText = line.replace(/^([•\-*]|\d+\.)\s+/, "");
-      currentBullets.push(cleanText);
-    } else if (isHeading) {
+    const isHeading =
+      isMarkdownHeading ||
+      isBoldHeaderLine ||
+      isBulletHeader ||
+      isCategoryHeader ||
+      (line.endsWith(":") && line.length < 60 && !/^([•\-*]|\d+\.)\s+/.test(line));
+
+    if (isHeading) {
       flushBullets();
-      const cleanHeading = line.replace(/^#{1,4}\s+/, "").replace(/:$/, "");
+      // Clean up markdown hashes, bullet symbols, bold markers, and trailing colons from heading text
+      const cleanHeading = line
+        .replace(/^#{1,4}\s+/, "")
+        .replace(/^([•\-*]|\d+\.)\s*/, "")
+        .replace(/^\*\*|\*\*$/g, "")
+        .replace(/\*\*:/, "")
+        .replace(/:$/, "")
+        .trim();
       blocks.push({ type: "heading", text: cleanHeading });
     } else {
-      flushBullets();
-      blocks.push({ type: "paragraph", text: line });
+      // 2. Detect bullet points
+      const isBullet = /^([•\-*]|\d+\.)\s+/.test(line);
+      if (isBullet) {
+        const cleanText = line.replace(/^([•\-*]|\d+\.)\s+/, "");
+        currentBullets.push(cleanText);
+      } else {
+        flushBullets();
+        blocks.push({ type: "paragraph", text: line });
+      }
     }
   });
   flushBullets();
