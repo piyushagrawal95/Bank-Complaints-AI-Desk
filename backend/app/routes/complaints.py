@@ -244,6 +244,8 @@ def create_complaint(body: CreateComplaintIn, user: dict = Depends(get_current_u
                 "message": f"Complaint #{new_id} recorded successfully.",
                 "complaint": row,
             }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Database error creating complaint")
         raise HTTPException(status_code=503, detail="Failed to record complaint in database.")
