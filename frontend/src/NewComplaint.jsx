@@ -531,9 +531,7 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
                   onChange={(e) => handleChange("consumer_email", e.target.value)}
                   className="email-input-field"
                 />
-                <span className="field-hint">
-                  Auto-populated if found in uploaded file. Official resolution letters will be dispatched to this email upon supervisor approval.
-                </span>
+                
               </div>
 
               <div className="form-group form-group-sm">
