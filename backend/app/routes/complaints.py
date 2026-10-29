@@ -94,10 +94,11 @@ def list_complaints(
         conditions.append("date_received <= %s")
         params.append(date_to)
     if q:
+        clean_q=q.strip().lstrip("#")
         conditions.append(
-            "(issue ILIKE %s OR sub_issue ILIKE %s OR company ILIKE %s OR consumer_email ILIKE %s)"
+            "(CAST(complaint_id AS TEXT) ILIKE %s OR issue ILIKE %s OR sub_issue ILIKE %s OR company ILIKE %s OR consumer_email ILIKE %s)"
         )
-        params.extend([f"%{q}%"] * 4)
+        params.extend([f"%{clean_q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"])
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     offset = (page - 1) * page_size
