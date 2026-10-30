@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { askRule } from "./api";
 import { IconCheck, IconCopy, IconRules } from "./Icons";
 import "./AskRules.css";
