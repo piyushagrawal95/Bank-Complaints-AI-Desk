@@ -1426,7 +1426,59 @@ tr.clickable:hover td:last-child {
 
 
 
-/* Email table tag in complaint explorer */
+/* Email table column styling in complaint explorer */
+.email-table-cell-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  max-width: 185px;
+  transition: all 0.15s ease;
+}
+
+.email-table-cell-badge svg {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.email-table-cell-badge:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.email-cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-table-cell-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #94a3b8;
+  font-size: 0.76rem;
+  font-style: italic;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.email-cell-dash {
+  color: #cbd5e1;
+  font-style: normal;
+  font-weight: 600;
+}
+
 .email-table-tag {
   display: inline-flex;
   align-items: center;

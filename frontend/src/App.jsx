@@ -381,6 +381,7 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
                     <th>Date</th>
                     <th>Product</th>
                     <th>Issue Description</th>
+                    <th>Consumer Email</th>
                     <th>Company</th>
                     <th>State</th>
                     <th>Response Status</th>
@@ -416,12 +417,20 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
                                 {c.sub_issue}
                               </span>
                             )}
-                            {c.consumer_email && (
-                              <span className="email-table-tag" title={c.consumer_email}>
-                                <IconMail size={12} /> {c.consumer_email}
-                              </span>
-                            )}
                           </div>
+                        </td>
+                        <td>
+                          {c.consumer_email ? (
+                            <span className="email-table-cell-badge" title={c.consumer_email}>
+                              <IconMail size={12} />
+                              <span className="email-cell-text">{c.consumer_email}</span>
+                            </span>
+                          ) : (
+                            <span className="email-table-cell-empty" title="Consumer email not provided">
+                              <span className="email-cell-dash">—</span>
+                              <span>Not provided</span>
+                            </span>
+                          )}
                         </td>
                         <td>
                           <div className="company-cell-modern">
