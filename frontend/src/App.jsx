@@ -222,69 +222,96 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
 
       {/* Filter Toolbar */}
       <form className="filters" onSubmit={applyFilters}>
-        <div className="search-box">
-          <span className="search-icon">
-            <IconSearch size={15} />
-          </span>
-          <input
-            name="q"
-            placeholder="Search keyword, issue, or bank..."
-            value={draft.q}
-            onChange={change}
-          />
-          {draft.q && (
-            <button
-              type="button"
-              className="search-clear-btn"
-              onClick={() => {
-                setDraft((prev) => ({ ...prev, q: "" }));
-                setFilters((prev) => ({ ...prev, q: "" }));
-                setPage(1);
-              }}
-              title="Clear search keyword"
-            >
-              ✕
+        <div className="filter-main-row">
+          <div className="search-box">
+            <span className="search-icon">
+              <IconSearch size={16} />
+            </span>
+            <input
+              name="q"
+              placeholder="Search keyword, issue description, or bank..."
+              value={draft.q}
+              onChange={change}
+            />
+            {draft.q && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => {
+                  setDraft((prev) => ({ ...prev, q: "" }));
+                  setFilters((prev) => ({ ...prev, q: "" }));
+                  setPage(1);
+                }}
+                title="Clear search keyword"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div className="filter-actions-group">
+            <button type="submit" className="primary-btn filter-submit-btn">
+              Filter
             </button>
-          )}
+            {isFiltered && (
+              <button
+                type="button"
+                className="secondary reset-btn"
+                onClick={resetFilters}
+                title="Reset all search filters"
+              >
+                ✕ Clear
+              </button>
+            )}
+          </div>
         </div>
-        <select name="product" value={draft.product} onChange={change}>
-          <option value="">All Products</option>
-          {products.map((p) => (
-            <option key={p.product} value={p.product}>
-              {p.product} ({p.count})
-            </option>
-          ))}
-        </select>
-        <input
-          name="state"
-          placeholder="State (e.g. CA, NY)"
-          maxLength={2}
-          value={draft.state}
-          onChange={change}
-          style={{ width: "95px" }}
-        />
-        <input
-          name="date_from"
-          type="date"
-          title="Received from"
-          value={draft.date_from}
-          onChange={change}
-        />
-        <input
-          name="date_to"
-          type="date"
-          title="Received until"
-          value={draft.date_to}
-          onChange={change}
-        />
-        <button type="submit" className="primary-btn">
-          Filter
-        </button>
-        {isFiltered && (
-          <button type="button" className="secondary reset-btn" onClick={resetFilters}>
-            ✕ Clear
-          </button>
-        )}
+
+        <div className="filter-sub-row">
+          <div className="filter-item filter-product">
+            <label className="filter-label">Product</label>
+            <select name="product" value={draft.product} onChange={change}>
+              <option value="">All Products</option>
+              {products.map((p) => (
+                <option key={p.product} value={p.product}>
+                  {p.product} ({p.count})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-item filter-state">
+            <label className="filter-label">State</label>
+            <input
+              name="state"
+              placeholder="e.g. NY"
+              maxLength={2}
+              value={draft.state}
+              onChange={change}
+            />
+          </div>
+
+          <div className="filter-item filter-date">
+            <label className="filter-label">Date From</label>
+            <input
+              name="date_from"
+              type="date"
+              title="Received from"
+              value={draft.date_from}
+              onChange={change}
+            />
+          </div>
+
+          <div className="filter-item filter-date">
+            <label className="filter-label">Date To</label>
+            <input
+              name="date_to"
+              type="date"
+              title="Received until"
+              value={draft.date_to}
+              onChange={change}
+            />
+          </div>
+        </div>
       </form>
 
       {/* Selected Complaint Detail Drawer */}
