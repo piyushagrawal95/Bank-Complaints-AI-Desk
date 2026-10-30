@@ -48,15 +48,15 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
   const turnstileRef = useRef(null);
   const widgetIdRef = useRef(null);
 
-  // Progressive feedback for cloud server cold starts
+  // Progressive feedback for loading states
   useEffect(() => {
     let t1, t2;
     if (loading) {
       t1 = setTimeout(() => {
-        setLoadingMessage((prev) => `${prev || "Connecting"} (Waking up cloud server...)`);
+        setLoadingMessage((prev) => `${prev || "Connecting"} (Please hold on...)`);
       }, 4500);
       t2 = setTimeout(() => {
-        setLoadingMessage("Cloud server is spinning up from idle (cold start). Please hold on...");
+        setLoadingMessage("Connecting securely, please wait a moment...");
       }, 11000);
     }
     return () => {
@@ -426,7 +426,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
               <div className="auth-spinner-box">
                 <div className="auth-spinner-ring"></div>
                 <p className="auth-spinner-title">{loadingMessage || "Please wait..."}</p>
-                <span className="auth-spinner-sub">Connecting to secure regulatory compliance server</span>
+                <span className="auth-spinner-sub">Securing your session, please wait</span>
               </div>
             </div>
           )}

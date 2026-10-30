@@ -358,7 +358,7 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
           </div>
           <h3>Complaint Recorded Successfully!</h3>
           <p className="success-lead">
-            Complaint reference <strong>#{createdComplaint.complaint_id}</strong> has been assigned and indexed in the PostgreSQL database.
+            Complaint reference <strong>#{createdComplaint.complaint_id}</strong> has been successfully assigned and registered.
           </p>
 
           <div className="success-meta-box">

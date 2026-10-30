@@ -302,10 +302,10 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
           <div className="server-error-left">
             <span className="server-error-icon">⚠️</span>
             <div>
-              <div className="server-error-title">Backend Connection Issue</div>
+              <div className="server-error-title">Unable to Connect</div>
               <div className="server-error-msg">{error}</div>
               <div className="server-error-sub">
-                If the cloud backend was inactive, it may take 40-50 seconds to wake up. Click retry to reconnect.
+                The service is taking longer than usual to respond. Please click retry to reconnect.
               </div>
             </div>
           </div>
@@ -314,7 +314,7 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
             className="btn-retry-modern"
             onClick={() => setRetryCount((c) => c + 1)}
           >
-            🔄 Retry Connection
+            🔄 Retry
           </button>
         </div>
       )}
@@ -323,10 +323,10 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
           <div className="inline-spinner"></div>
           <span style={{ fontSize: "0.92rem", fontWeight: 500 }}>
             {loadingSecs < 4
-              ? "Loading complaint records from database..."
+              ? "Loading complaints..."
               : loadingSecs < 12
-              ? `Connecting to cloud backend (${loadingSecs}s)... waking up instance`
-              : `Still connecting to backend (${loadingSecs}s)... please wait, instance is spinning up`}
+              ? `Connecting, please wait (${loadingSecs}s)...`
+              : `Still loading (${loadingSecs}s)... please wait a moment`}
           </span>
         </div>
       )}

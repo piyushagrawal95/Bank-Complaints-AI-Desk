@@ -265,10 +265,10 @@ function AskRules() {
           <div className="loading-pulse"></div>
           <p className="info">
             {loadingSecs < 4
-              ? "Searching official federal banking regulations (12 CFR)..."
+              ? "Searching official banking regulations..."
               : loadingSecs < 12
-              ? `Synthesizing compliance rules with Groq LLM (${loadingSecs}s)...`
-              : `Finalizing regulatory synthesis (${loadingSecs}s)... please wait`}
+              ? `Finding answers in rulebooks (${loadingSecs}s)...`
+              : `Finalizing answer (${loadingSecs}s)... please wait`}
           </p>
         </div>
       )}
@@ -278,10 +278,10 @@ function AskRules() {
           <div className="server-error-left">
             <span className="server-error-icon">⚠️</span>
             <div>
-              <div className="server-error-title">Compliance Assistant Unavailable</div>
+              <div className="server-error-title">Unable to Retrieve Rules</div>
               <div className="server-error-msg">{error}</div>
               <div className="server-error-sub">
-                If the cloud instance is waking up, please wait a moment and retry.
+                Please wait a moment and click retry to try again.
               </div>
             </div>
           </div>

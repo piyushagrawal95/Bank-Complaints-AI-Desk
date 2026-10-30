@@ -382,10 +382,10 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                 <div className="section-head-row">
                   <div>
                     <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#0f172a" }}>
-                      Similar Past Precedent Cases
+                      Similar Past Cases
                     </h3>
                     <p style={{ margin: "3px 0 0", fontSize: "0.82rem", color: "#64748b" }}>
-                      Historical complaints with matching dispute patterns and regulatory resolutions
+                      Past resolved complaints matching this dispute pattern
                     </p>
                   </div>
                   <button
@@ -396,12 +396,12 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                     {loadingSimilar ? (
                       <>
                         <span className="inline-spinner" style={{ width: 13, height: 13, borderWidth: 2 }} />
-                        <span>Searching Precedents...</span>
+                        <span>Searching Similar Cases...</span>
                       </>
                     ) : (
                       <>
                         <IconSearch size={14} />
-                        <span>{similarCases.length > 0 ? "Refresh Precedents" : "Find Precedent Cases"}</span>
+                        <span>{similarCases.length > 0 ? "Refresh Similar Cases" : "Find Similar Cases"}</span>
                       </>
                     )}
                   </button>
@@ -410,7 +410,7 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                 {loadingSimilar ? (
                   <div className="similar-loading-state">
                     <span className="inline-spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                    <span>Searching vector embeddings and regulatory precedent history...</span>
+                    <span>Finding similar resolved complaints...</span>
                   </div>
                 ) : similarCases.length > 0 ? (
                   <div className="similar-grid">
