@@ -97,62 +97,6 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
   const [retryCount, setRetryCount] = useState(0);
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(initialSelectedId);
-  const searchInputRef = useRef(null);
-
-  useEffect(() => {
-    function handleGlobalKeyDown(e) {
-      if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, []);
-
-  function exportToCSV() {
-    if (!data?.items?.length) return;
-    const headers = [
-      "Complaint ID",
-      "Date Received",
-      "Product",
-      "Issue Description",
-      "Company",
-      "State",
-      "Consumer Email",
-      "Response Status",
-      "Timely Response",
-    ];
-    const escapeCsv = (val) => {
-      if (val === null || val === undefined) return '""';
-      const str = String(val).replace(/"/g, '""');
-      return `"${str}"`;
-    };
-    const rows = data.items.map((c) => [
-      escapeCsv(c.complaint_id),
-      escapeCsv(c.date_received),
-      escapeCsv(c.product),
-      escapeCsv(c.issue),
-      escapeCsv(c.company),
-      escapeCsv(c.state || ""),
-      escapeCsv(c.consumer_email || ""),
-      escapeCsv(c.company_response_to_consumer || ""),
-      escapeCsv(c.timely_response === null ? "N/A" : c.timely_response ? "Yes" : "No"),
-    ]);
-    const csvContent = [headers.map((h) => `"${h}"`).join(","), ...rows.map((r) => r.join(","))].join("\r\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Bank_Complaints_Export_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
 
   useEffect(() => {
     let interval = null;
@@ -284,17 +228,11 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
               <IconSearch size={16} />
             </span>
             <input
-              ref={searchInputRef}
               name="q"
-              placeholder="Search keyword, issue description, or bank... (Press / to search)"
+              placeholder="Search keyword, issue description, or bank..."
               value={draft.q}
               onChange={change}
             />
-            {!draft.q && (
-              <kbd className="search-kbd" title="Shortcut: press / to search">
-                /
-              </kbd>
-            )}
             {draft.q && (
               <button
                 type="button"
@@ -325,15 +263,6 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
                 ✕ Clear
               </button>
             )}
-            <button
-              type="button"
-              className="secondary export-btn"
-              onClick={exportToCSV}
-              disabled={loading || !data?.items?.length}
-              title="Download currently displayed complaints as a CSV spreadsheet"
-            >
-              📥 Export CSV
-            </button>
           </div>
         </div>
 
