@@ -283,8 +283,8 @@ body {
 }
 
 .dropdown-menu-item:hover {
-  background: #f8fafc;
-  color: #0284c7;
+  background: #eff6ff !important;
+  color: #1e40af !important;
 }
 
 .dropdown-menu-item.logout-item {
@@ -775,8 +775,8 @@ body {
 }
 
 .tab:hover {
-  background: #f1f5f9 !important;
-  color: #0f172a !important;
+  background: #eff6ff !important;
+  color: #1e40af !important;
   border-radius: 6px 6px 0 0;
 }
 
@@ -801,7 +801,7 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: var(--primary-hover);
+  background: #2563eb;
 }
 
 button:disabled {
@@ -816,9 +816,10 @@ button.secondary {
 }
 
 button.secondary:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1e40af !important;
+  transform: translateY(-1px);
 }
 
 /* FILTERS FORM & SEARCH BAR */

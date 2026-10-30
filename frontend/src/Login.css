@@ -125,8 +125,8 @@
 }
 
 .mode-tab:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: #eff6ff !important;
+  color: #1e40af !important;
   transform: scale(1.02);
 }
 

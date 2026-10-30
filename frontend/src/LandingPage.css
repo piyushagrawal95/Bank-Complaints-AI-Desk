@@ -106,9 +106,9 @@
 }
 
 .btn-landing-login:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-  color: #0284c7;
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1e40af !important;
 }
 
 .btn-landing-signup {

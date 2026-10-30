@@ -62,9 +62,9 @@
 }
 
 .btn-refresh-approvals:hover:not(:disabled) {
-  background: #f1f5f9;
-  color: #0f172a;
-  border-color: #94a3b8;
+  background: #eff6ff !important;
+  color: #1e40af !important;
+  border-color: #bfdbfe !important;
 }
 
 /* APPROVAL ACTION TOAST */
@@ -421,9 +421,9 @@
 }
 
 .btn-view-explorer:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-  border-color: #94a3b8;
+  background: #eff6ff !important;
+  color: #1e40af !important;
+  border-color: #bfdbfe !important;
 }
 
 /* TAB BADGE FOR NAVBAR */

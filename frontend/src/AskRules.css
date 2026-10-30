@@ -270,9 +270,9 @@
 }
 
 .copy-answer-btn:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1e40af !important;
 }
 
 .copy-answer-btn.copied {
@@ -412,9 +412,9 @@
 }
 
 .citations-toggle-btn:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-  color: #0f172a;
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1e40af !important;
 }
 
 .citations-section {
