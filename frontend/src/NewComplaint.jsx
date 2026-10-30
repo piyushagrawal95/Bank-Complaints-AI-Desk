@@ -414,7 +414,7 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
                 </div>
                 <h4>Intelligent Document Ingestion</h4>
                 <p>
-                  Upload a <strong>PDF, Word (.docx), Excel (.xlsx/.xls), CSV, or TXT</strong> dispute document to automatically extract the narrative, bank entity, and consumer email address. Multi-record files will automatically trigger batch ingestion.
+                  Upload a dispute document (PDF, Word, Excel, CSV, or TXT) to automatically fill in the complaint details below. Multi-record files will automatically open in a batch review table.
                 </p>
               </div>
 
@@ -443,14 +443,9 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
               <div className="extract-banner">
                 <span className="extract-icon">✓</span>
                 <div>
-                  <strong>Successfully parsed "{extractSuccess.filename}"</strong>
+                  <strong>Document Uploaded Successfully</strong>
                   <p>
-                    Complaint attributes pre-filled below.
-                    {extractSuccess.hasEmail ? (
-                      <> Consumer email auto-populated: <code className="email-code">{extractSuccess.email}</code></>
-                    ) : (
-                      " No email found in document; you can enter it manually below."
-                    )}
+                    Details from <em>{extractSuccess.filename}</em> have been pre-filled into the form below. Please review and submit your dispute.
                   </p>
                 </div>
               </div>
