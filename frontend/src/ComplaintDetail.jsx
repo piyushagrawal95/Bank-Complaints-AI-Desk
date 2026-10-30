@@ -215,6 +215,99 @@ function ComplaintDetail({ id, currentUser, onClose }) {
     document.body.removeChild(link);
   }
 
+  function handlePrintLetter() {
+    if (!replyDraft) return;
+    const printWindow = window.open("", "_blank", "width=850,height=900");
+    if (!printWindow) {
+      alert("Please allow popups to print the official resolution letter.");
+      return;
+    }
+    const dateFormatted = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const institution = complaint?.company || "Financial Institution";
+    const escapeHtml = (str) => (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Official Resolution Notice - Complaint #${id}</title>
+  <style>
+    @page { size: A4; margin: 18mm 20mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #0f172a; margin: 0; padding: 32px; line-height: 1.6; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e3a8a; padding-bottom: 18px; margin-bottom: 24px; }
+    .brand-title { font-size: 22px; font-weight: 800; color: #1e3a8a; margin: 0; letter-spacing: -0.3px; }
+    .brand-sub { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+    .badge-approved { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-block; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; font-size: 13px; }
+    .meta-row { display: flex; justify-content: space-between; }
+    .meta-label { color: #64748b; font-weight: 600; }
+    .meta-val { color: #0f172a; font-weight: 600; }
+    .section-title { font-size: 13.5px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.6px; margin: 0 0 10px; }
+    .letter-body { background: #ffffff; border-left: 3px solid #2563eb; padding: 16px 20px; font-size: 13.5px; line-height: 1.75; color: #1e293b; white-space: pre-wrap; margin-bottom: 32px; }
+    .signature-row { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 16px; }
+    .sign-box { width: 220px; border-top: 1px solid #cbd5e1; padding-top: 6px; }
+    .sign-name { font-weight: 700; font-size: 13px; color: #0f172a; }
+    .sign-role { font-size: 11.5px; color: #64748b; }
+    .legal-disclaimer { font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 36px; line-height: 1.5; }
+    .no-print-bar { margin-bottom: 24px; display: flex; justify-content: flex-end; gap: 10px; }
+    .btn-print { background: #1d4ed8; color: #ffffff; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
+    .btn-print:hover { background: #1e40af; }
+    @media print {
+      .no-print-bar { display: none !important; }
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <button class="btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+  </div>
+  <div class="header">
+    <div>
+      <h1 class="brand-title">${escapeHtml(institution)}</h1>
+      <div class="brand-sub">Consumer Dispute Resolution &bull; Regulatory Compliance Operations</div>
+    </div>
+    <div style="text-align: right;">
+      <div class="badge-approved">&#10003; Formally Approved</div>
+      <div style="font-size: 11px; color: #64748b; margin-top: 5px;">Date: ${dateFormatted}</div>
+    </div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-row"><span class="meta-label">Complaint Reference:</span> <span class="meta-val">#${id}</span></div>
+    <div class="meta-row"><span class="meta-label">Product / Service:</span> <span class="meta-val">${escapeHtml(complaint?.product || "N/A")}</span></div>
+    <div class="meta-row"><span class="meta-label">Dispute Issue:</span> <span class="meta-val">${escapeHtml(complaint?.issue || "N/A")}</span></div>
+    <div class="meta-row"><span class="meta-label">Customer Delivery Email:</span> <span class="meta-val">${escapeHtml(complaint?.consumer_email || "Not specified")}</span></div>
+  </div>
+
+  <div class="section-title">Official Determination &amp; Resolution Statement:</div>
+  <div class="letter-body">${escapeHtml(replyDraft)}</div>
+
+  <div class="signature-row">
+    <div class="sign-box">
+      <div class="sign-name">${escapeHtml(approverName)}</div>
+      <div class="sign-role">${escapeHtml(approverRole)} &bull; Regulatory Compliance</div>
+    </div>
+    <div class="sign-box" style="text-align: right;">
+      <div class="sign-name">Bank Complaint AI Desk</div>
+      <div class="sign-role">Official Audit Record &bull; Ref #${id}</div>
+    </div>
+  </div>
+
+  <div class="legal-disclaimer">
+    <strong>Regulatory Notice:</strong> This document constitutes the formal written determination issued pursuant to federal consumer financial protection statutes, including the Electronic Fund Transfer Act (Regulation E, 12 CFR Part 1005) and Truth in Lending Act (Regulation Z, 12 CFR Part 1026). Records of this investigation are retained for statutory examination by the Consumer Financial Protection Bureau (CFPB).
+  </div>
+</body>
+</html>`;
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
   const isApproved = responseRecord?.status === "approved" || responseRecord?.status === "dispatched";
   const isPending = responseRecord?.status === "pending_approval";
   const isRejected = responseRecord?.status === "rejected";
@@ -534,7 +627,10 @@ function ComplaintDetail({ id, currentUser, onClose }) {
                           <button className="secondary small-action-btn" onClick={handleCopy}>
                             {copied ? "✓ Copied!" : "Copy"}
                           </button>
-                          <button className="secondary small-action-btn" onClick={handleDownload}>
+                          <button className="primary small-action-btn" onClick={handlePrintLetter} title="Print formal letterhead resolution notice or save as PDF">
+                            🖨️ Print / PDF Letter
+                          </button>
+                          <button className="secondary small-action-btn" onClick={handleDownload} title="Download raw plaintext response">
                             Download .txt
                           </button>
                         </div>

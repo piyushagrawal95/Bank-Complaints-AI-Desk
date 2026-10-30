@@ -206,70 +206,78 @@ def send_complaint_approval_email(
     <html>
     <head>
       <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #f8fafc; margin: 0; padding: 24px; }}
-        .card {{ max-width: 620px; margin: 0 auto; background: #131d33; border: 1px solid #1e293b; border-radius: 12px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }}
-        .header {{ display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #1e293b; padding-bottom: 20px; margin-bottom: 24px; }}
-        .badge {{ background: #059669; color: #ecfdf5; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; display: inline-block; }}
-        .title {{ font-size: 20px; font-weight: 700; color: #ffffff; margin: 0; }}
-        .meta-box {{ background: #0b1120; border-radius: 8px; padding: 16px; margin-bottom: 24px; font-size: 14px; border: 1px solid #1e293b; }}
-        .meta-row {{ display: flex; justify-content: space-between; margin-bottom: 8px; }}
-        .meta-row:last-child {{ margin-bottom: 0; }}
-        .meta-label {{ color: #94a3b8; font-weight: 500; }}
-        .meta-value {{ color: #f1f5f9; font-weight: 600; }}
-        .resolution-box {{ background: #0f172a; border-left: 4px solid #10b981; border-radius: 6px; padding: 20px; color: #e2e8f0; font-size: 15px; line-height: 1.6; white-space: pre-wrap; margin-bottom: 24px; font-family: 'Courier New', Courier, monospace; }}
-        .footer {{ font-size: 12px; color: #64748b; border-top: 1px solid #1e293b; padding-top: 20px; line-height: 1.5; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #0f172a; margin: 0; padding: 24px 12px; }}
+        .card {{ max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06); }}
+        .header-bar {{ background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); padding: 24px 32px; color: #ffffff; }}
+        .header-top {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }}
+        .bank-brand {{ font-size: 18px; font-weight: 700; letter-spacing: -0.3px; color: #ffffff; }}
+        .badge {{ background: #10b981; color: #ffffff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; }}
+        .header-title {{ font-size: 21px; font-weight: 700; margin: 0; color: #ffffff; line-height: 1.3; }}
+        .content-body {{ padding: 32px; }}
+        .greeting {{ font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 16px; }}
+        .meta-box {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px; margin: 24px 0; font-size: 13.5px; }}
+        .meta-row {{ display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }}
+        .meta-row:last-child {{ border-bottom: none; }}
+        .meta-label {{ color: #64748b; font-weight: 500; }}
+        .meta-value {{ color: #0f172a; font-weight: 600; text-align: right; }}
+        .section-label {{ font-size: 14px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 10px; }}
+        .resolution-box {{ background: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #2563eb; border-radius: 6px; padding: 20px; color: #1e293b; font-size: 14px; line-height: 1.7; white-space: pre-wrap; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }}
+        .regulatory-note {{ font-size: 12.5px; color: #64748b; line-height: 1.6; background: #eff6ff; border-radius: 6px; padding: 12px 16px; margin: 24px 0 0; border: 1px solid #dbeafe; }}
+        .footer {{ font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding: 20px 32px; background: #fafafa; text-align: center; line-height: 1.5; }}
       </style>
     </head>
     <body>
       <div class="card">
-        <div class="header">
-          <div>
-            <div class="badge">Official Compliance Resolution</div>
-            <h1 class="title" style="margin-top: 8px;">Bank Complaint Resolution Approved</h1>
+        <div class="header-bar">
+          <div class="header-top">
+            <span class="bank-brand">{company}</span>
+            <span class="badge">&#10003; Approved &amp; Verified</span>
           </div>
+          <h1 class="header-title">Official Dispute Resolution Notice</h1>
         </div>
 
-        <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">
-          Dear Customer,
-        </p>
-        <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">
-          We are writing to inform you that your dispute submitted under <strong>Complaint #{complaint_id}</strong> has been thoroughly investigated and formally approved by bank compliance leadership.
-        </p>
+        <div class="content-body">
+          <p class="greeting">Dear Customer,</p>
+          <p class="greeting">
+            We are writing to provide you with the formal determination regarding your dispute registered under <strong>Complaint #{complaint_id}</strong>. This matter has undergone thorough investigation and regulatory review by compliance leadership.
+          </p>
 
-        <div class="meta-box">
-          <div class="meta-row">
-            <span class="meta-label">Complaint Reference:</span>
-            <span class="meta-value">#{complaint_id}</span>
+          <div class="meta-box">
+            <div class="meta-row">
+              <span class="meta-label">Complaint Reference:</span>
+              <span class="meta-value">#{complaint_id}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Financial Institution:</span>
+              <span class="meta-value">{company}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Product / Vertical:</span>
+              <span class="meta-value">{product}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Dispute Issue:</span>
+              <span class="meta-value">{issue}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Compliance Approver:</span>
+              <span class="meta-value">{approver_name} ({approver_role.title()})</span>
+            </div>
           </div>
-          <div class="meta-row">
-            <span class="meta-label">Financial Institution:</span>
-            <span class="meta-value">{company}</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Product / Service:</span>
-            <span class="meta-value">{product}</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Dispute Issue:</span>
-            <span class="meta-value">{issue}</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Approved By:</span>
-            <span class="meta-value">{approver_name} ({approver_role.title()})</span>
+
+          <div class="section-label">Official Determination &amp; Letter:</div>
+          <div class="resolution-box">{resolution_text}</div>
+
+          <div class="regulatory-note">
+            <strong>Regulatory Compliance Notice:</strong> This determination adheres to federal financial consumer protection regulations, including Regulation E (12 CFR Part 1005), Regulation Z (12 CFR Part 1026), and CFPB examination standards.
           </div>
         </div>
-
-        <h3 style="color: #f8fafc; font-size: 16px; margin-bottom: 12px;">Official Bank Resolution Letter:</h3>
-        <div class="resolution-box">{resolution_text}</div>
-
-        <p style="color: #94a3b8; font-size: 14px; line-height: 1.5;">
-          This determination adheres to applicable federal consumer protection laws, including Regulation E (12 CFR Part 1005), Regulation Z (12 CFR Part 1026), and CFPB compliance guidelines.
-        </p>
 
         <div class="footer">
-          <p>Bank Complaint AI Desk &bull; Consumer Dispute Compliance Department<br>
-          This is an automated notification of formal resolution approval.</p>
+          <p style="margin: 0;">Bank Complaint AI Desk &bull; Consumer Dispute Compliance Department</p>
+          <p style="margin: 4px 0 0;">This is an automated notification of formal dispute resolution. All rights reserved.</p>
         </div>
       </div>
     </body>
