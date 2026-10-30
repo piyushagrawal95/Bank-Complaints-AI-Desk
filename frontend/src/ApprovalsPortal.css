@@ -184,11 +184,25 @@
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05);
-  transition: border-color 0.15s ease;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: approvalCardSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .approval-card:hover {
-  border-color: #93c5fd;
+  border-color: #60a5fa;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -4px rgba(30, 64, 175, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+}
+
+@keyframes approvalCardSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .approval-card-topbar {

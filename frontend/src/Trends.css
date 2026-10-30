@@ -399,12 +399,14 @@
   color: #991b1b;
   border: 1px solid #fca5a5;
   box-shadow: 0 2px 6px rgba(239, 68, 68, 0.1);
+  animation: pulseAlertBanner 3s infinite ease-in-out;
 }
 
 .trend-ok {
   background: #ecfdf5;
   color: #065f46;
   border: 1px solid #a7f3d0;
+  animation: fadeIn 0.3s ease-out;
 }
 
 .spike-grid {
@@ -421,11 +423,14 @@
   border-radius: 10px;
   padding: 1.25rem;
   box-shadow: 0 4px 10px rgba(220, 38, 38, 0.06);
-  transition: transform 0.15s;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: spikeCardSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .spike-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px -3px rgba(220, 38, 38, 0.12), 0 4px 6px -2px rgba(220, 38, 38, 0.05);
+  border-color: #f87171;
 }
 
 .spike-head {
@@ -444,11 +449,49 @@
 .spike-change {
   background: #ef4444;
   color: white;
-  padding: 0.25rem 0.6rem;
+  padding: 0.25rem 0.65rem;
   border-radius: 20px;
   font-weight: 800;
   font-size: 0.82rem;
   letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);
+  animation: pulseBadgeGlow 2.5s infinite ease-in-out;
+}
+
+@keyframes pulseAlertBanner {
+  0%, 100% {
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.1);
+    border-color: #fca5a5;
+  }
+  50% {
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
+    border-color: #f87171;
+  }
+}
+
+@keyframes pulseBadgeGlow {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+  }
+}
+
+@keyframes spikeCardSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .spike-meta {

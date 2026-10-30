@@ -213,11 +213,13 @@ def test_similar_complaints_search(client):
 
 
 def test_complaint_creation_and_approval_workflow(client):
+    import uuid
     from app.security import create_access_token
     agent = get_agent_user()
     admin = get_admin_user()
     agent_token = create_access_token(user_id=agent["id"], role="agent")
     admin_token = create_access_token(user_id=admin["id"], role="admin")
+    test_email = f"consumer.test.{uuid.uuid4().hex[:8]}@example.com"
 
     # 1. Agent creates complaint
     res_create = client.post(
@@ -227,14 +229,14 @@ def test_complaint_creation_and_approval_workflow(client):
             "product": "Credit card or prepaid card",
             "issue": "Dispute on unauthorized fee",
             "company": "JPMorgan Chase & Co.",
-            "consumer_email": "consumer.test@example.com",
+            "consumer_email": test_email,
             "narrative": "Unauthorized monthly maintenance fee was deducted from my account without disclosure.",
         },
     )
     assert res_create.status_code == 200
     complaint_data = res_create.json()["complaint"]
     cid = complaint_data["complaint_id"]
-    assert complaint_data["consumer_email"] == "consumer.test@example.com"
+    assert complaint_data["consumer_email"] == test_email
 
     # 2. Agent submits draft for approval
     res_req = client.post(
