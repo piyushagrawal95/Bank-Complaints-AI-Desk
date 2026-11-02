@@ -826,7 +826,7 @@ def update_user_role(body: RoleUpdateIn, admin=Depends(require_role("admin"))):
 
 
 @router.post("/role-upgrade/request")
-def request_role_upgrade(body: RoleUpgradeRequestIn, user=Depends(get_current_user)):
+def request_role_upgrade(request: Request, body: RoleUpgradeRequestIn, user=Depends(get_current_user)):
     """Allows an Agent or Supervisor to request a formal promotion to Supervisor or Admin."""
     user_id = user["id"]
     current_role = (user.get("role") or "agent").lower()
@@ -865,25 +865,113 @@ def request_role_upgrade(body: RoleUpgradeRequestIn, user=Depends(get_current_us
         logger.exception("Database error while creating role upgrade request")
         raise HTTPException(status_code=503, detail="Database error. Please try again.")
 
-    # Send non-blocking notification to Super Admin
+    # Send non-blocking notification to Super Admin with clickable portal link
     try:
         user_name = user.get("full_name") or user.get("email")
+        user_email = user.get("email") or ""
         super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
-        subject = f"Role Upgrade Request: {user_name} requests {target_role.upper()}"
-        html_content = f"""
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>Bank Complaint AI Desk — Role Upgrade Request</h2>
-            <p>User <strong>{user_name}</strong> ({user.get('email')}) has requested promotion:</p>
-            <ul>
-                <li><strong>Current Role:</strong> {current_role.upper()}</li>
-                <li><strong>Requested Role:</strong> {target_role.upper()}</li>
-                <li><strong>Reason:</strong> {body.reason or 'No reason provided'}</li>
-            </ul>
-            <p>Please log in to the User Management Portal to review and approve or reject this request.</p>
-        </div>
-        """
-        plain_content = f"User {user_name} ({user.get('email')}) requested promotion from {current_role} to {target_role}.\nReason: {body.reason}\nPlease log in to review."
-        dispatch_email_transport(super_admin, subject, html_content, plain_content)
+        subject = f"Action Required: Role Upgrade Request from {user_name} ({target_role.upper()})"
+        
+        client_origin = request.headers.get("origin")
+        portal_url = (client_origin or os.getenv("FRONTEND_ORIGIN") or settings.frontend_origin or "https://bank-complaints-ai-desk.vercel.app").rstrip("/")
+
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 24px 12px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #0f172a;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-top: 5px solid #1e40af; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="padding: 24px 30px; border-bottom: 1px solid #f1f5f9;">
+      <span style="display: inline-block; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 10px; border-radius: 9999px; margin-bottom: 10px;">
+        Action Required: User Role Elevation
+      </span>
+      <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em;">
+        Role Upgrade Request Awaiting Review
+      </h2>
+      <p style="margin: 6px 0 0; font-size: 13px; color: #64748b;">
+        Bank Complaint AI Desk &bull; Enterprise Governance &amp; RBAC Access Control
+      </p>
+    </div>
+
+    <!-- Body Details -->
+    <div style="padding: 24px 30px;">
+      <p style="margin: 0 0 16px; font-size: 15px; color: #334155; line-height: 1.6;">
+        Hello Administrator,
+      </p>
+      <p style="margin: 0 0 18px; font-size: 15px; color: #334155; line-height: 1.6;">
+        A team member has formally requested elevated role permissions in the bank dispute desk:
+      </p>
+
+      <!-- Details Card -->
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; width: 35%;">Applicant Name:</td>
+            <td style="padding: 6px 0; color: #0f172a; font-weight: 700;">{html.escape(user_name)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">Email Address:</td>
+            <td style="padding: 6px 0; color: #0f172a; font-weight: 600;">{html.escape(user_email)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">Current Role:</td>
+            <td style="padding: 6px 0; color: #475569; font-weight: 600; text-transform: uppercase;">{current_role.upper()}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">Requested Role:</td>
+            <td style="padding: 6px 0;">
+              <span style="background-color: #dbeafe; color: #1e40af; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 13px; text-transform: uppercase;">
+                {target_role.upper()}
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; vertical-align: top;">Business Reason:</td>
+            <td style="padding: 6px 0; color: #1e293b; font-style: italic; line-height: 1.4;">
+              "{html.escape(body.reason or 'No specific justification provided')}"
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Action Button / Link -->
+      <div style="text-align: center; margin: 30px 0 20px;">
+        <a href="{portal_url}" style="display: inline-block; background-color: #1e40af; color: #ffffff; font-weight: 700; font-size: 15px; text-decoration: none; padding: 13px 32px; border-radius: 8px; box-shadow: 0 4px 14px rgba(30, 64, 175, 0.3);">
+          👉 Log in to Review Request
+        </a>
+      </div>
+
+      <p style="text-align: center; font-size: 13px; color: #64748b; margin: 0;">
+        Or access directly via: <a href="{portal_url}" style="color: #2563eb; text-decoration: underline; font-weight: 500;">{portal_url}</a>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #0f172a; padding: 16px 30px; text-align: center; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+      Bank Complaint AI Desk &bull; Systems &amp; Compliance Management<br>
+      This is an internal governance alert for designated System Administrators.
+    </div>
+
+  </div>
+</body>
+</html>"""
+
+        plain_content = f"""BANK COMPLAINT AI DESK — ROLE UPGRADE REQUEST
+================================================================================
+Applicant: {user_name} ({user_email})
+Current Role: {current_role.upper()}
+Requested Role: {target_role.upper()}
+Reason: {body.reason or 'No reason provided'}
+
+To review and approve or reject this request, please log in below:
+{portal_url}
+================================================================================
+"""
+        dispatch_email_transport(super_admin, subject, html_content, plain_content, client_origin=client_origin)
     except Exception as email_err:
         logger.warning(f"Could not dispatch email notification for role upgrade: {email_err}")
 
@@ -947,7 +1035,7 @@ def list_pending_role_upgrades(admin=Depends(require_role("admin"))):
 
 
 @router.post("/role-upgrade/{request_id}/approve")
-def approve_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
+def approve_role_upgrade(request: Request, request_id: int, admin=Depends(require_role("admin"))):
     """Admin endpoint to formally approve a role upgrade request and update user permissions."""
     admin_id = admin["id"]
     try:
@@ -982,6 +1070,7 @@ def approve_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
                 user_name = user_info.get("full_name") or target_email.split("@")[0]
                 admin_name = admin.get("full_name") or admin.get("email", "Admin")
                 subject = f"Role Upgrade Approved: Welcome to {new_role.upper()}"
+                portal_url = (request.headers.get("origin") or os.getenv("FRONTEND_ORIGIN") or settings.frontend_origin or "https://bank-complaints-ai-desk.vercel.app").rstrip("/")
                 html_content = f"""
                 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
                     <div style="background: #1e3a8a; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
@@ -1000,6 +1089,11 @@ def approve_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
                     <p style="color: #475569; font-size: 14px;">
                         Your elevated permissions are active right now. Next time you view your desk, you will have full access to your new tools and workflows.
                     </p>
+                    <div style="text-align: center; margin: 24px 0 16px;">
+                        <a href="{portal_url}" style="display: inline-block; background-color: #16a34a; color: #ffffff; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px;">
+                            🚀 Log in to Your Account
+                        </a>
+                    </div>
                     <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
                     <p style="color: #94a3b8; font-size: 12px; margin: 0;">
                         Automated notification from Bank Complaint AI Desk Compliance & Governance Engine.

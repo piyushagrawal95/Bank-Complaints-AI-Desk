@@ -402,6 +402,12 @@ def send_supervisor_approval_request_email(
 
         <p style="font-size: 14px; color: #475569;">Prompt approval ensures timely delivery to the consumer within mandatory regulatory windows (e.g. Regulation E / Z).</p>
 
+        <div style="text-align: center; margin: 26px 0 20px;">
+          <a href="{client_origin or 'https://bank-complaints-ai-desk.vercel.app'}" style="display: inline-block; background-color: #1e40af; color: #ffffff; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25);">
+            👉 Log in to Approvals Portal
+          </a>
+        </div>
+
         <div class="footer">
           <p>Bank Complaint AI Desk &bull; Regulatory Compliance Operations</p>
         </div>
