@@ -190,7 +190,7 @@ def signup(body: SignupIn, request: Request):
 
     msg = "Account created successfully! Please verify your email before logging in."
     if email_sent:
-        msg = "Account created successfully! A confirmation email has been dispatched to your inbox (check Spam/Junk if not visible)."
+        msg = "Account created successfully! A confirmation email has been dispatched to your inbox."
 
     return {
         "message": msg,

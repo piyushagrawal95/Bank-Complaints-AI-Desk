@@ -385,7 +385,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
         setLoadingMessage("Sending password reset instructions...");
         const res = await forgotPassword(email);
         setSuccess(
-          res.message || "If this email is registered, a password reset link has been issued. Please check your inbox (and spam folder) to set your new password."
+          res.message || "If this email is registered, a password reset link has been issued. Please check your inbox to set your new password."
         );
         setEmail("");
       } else if (mode === "reset") {
