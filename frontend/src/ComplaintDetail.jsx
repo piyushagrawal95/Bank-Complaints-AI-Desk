@@ -20,7 +20,7 @@ import {
 } from "./Icons";
 import "./ComplaintDetail.css";
 
-function ComplaintDetail({ id, currentUser, onClose }) {
+function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -92,6 +92,9 @@ function ComplaintDetail({ id, currentUser, onClose }) {
       const res = await updateComplaintEmail(id, emailInput.trim());
       setComplaint((prev) => ({ ...prev, consumer_email: res.consumer_email }));
       setIsEditingEmail(false);
+      if(onEmailUpdated){
+        onEmailUpdated(id,res.consumer_email)
+      }
     } catch (err) {
       alert("Failed to update email: " + err.message);
     } finally {

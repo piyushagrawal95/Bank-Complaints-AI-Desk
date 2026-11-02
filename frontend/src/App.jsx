@@ -184,6 +184,20 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
     setPage(1);
   }
 
+  function handleEmailUpdated(complaintId, newEmail) {
+    setData((prev) => {
+      if (!prev || !prev.items) return prev;
+      return {
+        ...prev,
+        items: prev.items.map((item) =>
+          item.complaint_id === complaintId
+            ? { ...item, consumer_email: newEmail }
+            : item
+        ),
+      };
+    });
+  }
+
   const totalPages = data ? data.total_pages : 0;
   const isFiltered = Object.values(filters).some((v) => v !== "") || Object.values(draft).some((v) => v !== "");
 
@@ -321,6 +335,7 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
           id={selectedId}
           currentUser={currentUser}
           onClose={() => setSelectedId(null)}
+          onEmailUpdated={handleEmailUpdated}
         />
       )}
 
