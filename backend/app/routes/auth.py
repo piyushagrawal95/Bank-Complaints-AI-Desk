@@ -133,11 +133,10 @@ def signup(body: SignupIn, request: Request):
     if body.confirm_password and body.confirm_password != body.password:
         raise HTTPException(status_code=400, detail="Passwords do not match.")
 
-    email = body.email.lower()
-    super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
-    is_super = (email == super_admin or email == "piyushagrawal300504@gmail.com")
-    init_role = "admin" if is_super else "agent"
-    init_active = True if is_super else False
+    email = body.email.lower().strip()
+    # ALL signups via public registration are assigned role 'agent' and is_active = False pending email verification
+    init_role = "agent"
+    init_active = False
     supervisor_id = None
     try:
         with pool.connection() as conn:
@@ -170,23 +169,13 @@ def signup(body: SignupIn, request: Request):
     if row is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
-    # Dynamically resolve client origin for Vercel vs Localhost
-    origin = request.headers.get("origin")
-    if not origin and request.headers.get("referer"):
-        parsed = urlparse(request.headers.get("referer"))
-        origin = f"{parsed.scheme}://{parsed.netloc}"
-    client_origin = (origin or settings.frontend_origin).rstrip("/")
+    client_origin = settings.get_safe_frontend_origin(request)
 
     email_sent = False
-    confirm_link = None
     try:
-        print(f"\n==========================================")
-        print(f"[MAIL SENDER] Sending confirmation to: {row['email']}")
-        email_sent, confirm_link = send_confirmation_email(row["email"], row["full_name"], client_origin=client_origin)
-        print(f"[MAIL SENDER] Status email_sent={email_sent} | Verification link: {confirm_link}")
-        print(f"==========================================\n")
+        email_sent, _ = send_confirmation_email(row["email"], row["full_name"], client_origin=client_origin)
     except Exception as exc:
-        print(f"[MAIL ERROR] Failed to send email: {exc}")
+        logger.warning(f"Failed to dispatch account confirmation email: {exc}")
 
     msg = "Account created successfully! Please verify your email before logging in."
     if email_sent:
@@ -195,7 +184,6 @@ def signup(body: SignupIn, request: Request):
     return {
         "message": msg,
         "email_sent": email_sent,
-        "dev_verification_link": confirm_link,
     }
 
 
@@ -300,86 +288,55 @@ def login_with_google(body: GoogleLoginIn):
             detail="Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID in backend/.env",
         )
 
-    idinfo = None
-    verification_error = None
-
-    # Step 1: Official Google OAuth2 verification with clock skew tolerance
+    # Strictly require verified cryptographic signature from Google
     try:
         idinfo = id_token.verify_oauth2_token(
             body.credential,
             google_requests.Request(),
             client_id,
-            clock_skew_in_seconds=60,
+            clock_skew_in_seconds=10,
         )
     except Exception as exc:
-        verification_error = str(exc)
-        logger.warning(f"Google verify_oauth2_token failed with audience {client_id}: {exc}")
-        # Try without strict audience in case Google returned an alternate audience format
-        try:
-            idinfo = id_token.verify_oauth2_token(
-                body.credential,
-                google_requests.Request(),
-                clock_skew_in_seconds=60,
-            )
-        except Exception as exc2:
-            logger.warning(f"Google verify_oauth2_token without audience also failed: {exc2}")
-
-    # Step 2: Fallback JWT claim decoding if Google cert fetch or cloud clock skew fails
-    if not idinfo:
-        try:
-            claims = jwt.decode(body.credential, options={"verify_signature": False})
-            issuer = claims.get("iss", "")
-            if issuer in ["accounts.google.com", "https://accounts.google.com"]:
-                # Check expiration with 10-minute leeway for cloud container clock drift
-                now = datetime.now(timezone.utc).timestamp()
-                exp = claims.get("exp", 0)
-                if exp + 600 >= now and claims.get("email"):
-                    idinfo = claims
-                    logger.info("Successfully authenticated Google user via decoded claims fallback")
-        except Exception as fallback_exc:
-            logger.exception(f"Failed to decode fallback Google JWT: {fallback_exc}")
+        logger.warning(f"Google verify_oauth2_token signature verification failed: {exc}")
+        raise HTTPException(
+            status_code=401,
+            detail="Google authentication failed: Invalid or expired token signature.",
+        )
 
     if not idinfo or "email" not in idinfo:
         raise HTTPException(
             status_code=401,
-            detail=f"Google authentication failed: {verification_error or 'Invalid or expired Google token'}",
+            detail="Google authentication failed: Token missing email identity claim.",
         )
 
     email = idinfo["email"].lower().strip()
     full_name = idinfo.get("name") or idinfo.get("given_name") or email.split("@")[0]
-    super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
-    is_super = (email == super_admin or email == "piyushagrawal300504@gmail.com")
-    init_role = "admin" if is_super else "agent"
 
     try:
         with pool.connection() as conn:
-            # Check if user already exists
             user = conn.execute(
                 "SELECT id, email, full_name, role, is_active FROM users WHERE email = %s",
                 [email],
             ).fetchone()
 
-            if not user:
-                # Insert new user with is_active = true
+            if user:
+                # If an administrator explicitly deactivated this account, Google OAuth cannot bypass the ban
+                if not user["is_active"]:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Your account has been deactivated by an Administrator. Please contact support.",
+                    )
+            else:
+                # New Google users are created strictly with standard 'agent' role
                 user = conn.execute(
                     """
                     INSERT INTO users (email, password_hash, full_name, role, is_active)
-                    VALUES (%s, 'oauth_google', %s, %s, true)
-                    ON CONFLICT (email) DO UPDATE SET is_active = true
+                    VALUES (%s, 'oauth_google', %s, 'agent', true)
+                    ON CONFLICT (email) DO NOTHING
                     RETURNING id, email, full_name, role, is_active
                     """,
-                    [email, full_name, init_role],
+                    [email, full_name],
                 ).fetchone()
-            else:
-                # Existing user - ensure active since Google login proves email ownership
-                target_role = "admin" if is_super else user["role"]
-                if not user["is_active"] or (is_super and user["role"] != "admin"):
-                    conn.execute(
-                        "UPDATE users SET is_active = true, role = %s WHERE id = %s",
-                        [target_role, user["id"]],
-                    )
-                    user["is_active"] = True
-                    user["role"] = target_role
 
     except Exception as exc:
         logger.exception("Database error during Google login")
@@ -437,40 +394,7 @@ def dispatch_email_transport(to_email: str, subject: str, html_content: str, tex
         except Exception as exc:
             logger.warning(f"Brevo HTTPS dispatch failed for {to_email}: {exc}")
 
-    # 2. Vercel Serverless Function Relay (HTTPS Port 443 -> Vercel Node.js -> Gmail Port 465)
-    # Bypasses Render outbound SMTP port blocking and sends to ANY recipient email worldwide via Gmail.
-    relay_urls = []
-    if client_origin and client_origin.startswith("http") and "localhost" not in client_origin and "127.0.0.1" not in client_origin:
-        relay_urls.append(f"{client_origin.rstrip('/')}/api/send-email")
-
-    vercel_url = os.getenv("VERCEL_URL", "").strip()
-    if vercel_url:
-        if not vercel_url.startswith("http"):
-            vercel_url = f"https://{vercel_url}"
-        cand = f"{vercel_url.rstrip('/')}/api/send-email"
-        if cand not in relay_urls:
-            relay_urls.append(cand)
-
-    for relay_url in relay_urls:
-        try:
-            payload = json.dumps({
-                "to_email": to_email,
-                "subject": subject,
-                "html": html_content,
-                "text": text_content,
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                relay_url,
-                data=payload,
-                headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                if resp.status in (200, 201):
-                    logger.info(f"Email successfully dispatched via Vercel Serverless Relay ({relay_url}) to {to_email}")
-                    return True
-        except Exception as exc:
-            logger.warning(f"Vercel serverless relay ({relay_url}) failed: {exc}")
+    # Direct secure transports: Brevo REST API -> Resend API -> SMTP
     # 1. Resend API (HTTPS Port 443 - Recommended for Render & Vercel)
     resend_key = (os.getenv("RESEND_API_KEY") or settings.resend_api_key or "").strip()
     if resend_key:
@@ -588,7 +512,7 @@ def send_confirmation_email(to_email: str, full_name: str | None = None, client_
     base_origin = (client_origin or settings.frontend_origin).rstrip("/")
     confirm_link = f"{base_origin}/?verify_email={verify_token}"
 
-    name_display = full_name if full_name else "Bank Associate"
+    name_display = html.escape(full_name) if full_name else "Bank Associate"
     subject = "Confirm Your Account - Bank Complaint AI Desk"
     html_content = f"""
     <html>
@@ -663,12 +587,7 @@ def forgot_password(body: ForgotPasswordIn, request: Request):
         logger.exception("Error creating reset token")
         raise HTTPException(status_code=503, detail="Database is unavailable. Please try again.")
 
-    # Dynamically resolve client origin for Vercel vs Localhost
-    origin = request.headers.get("origin")
-    if not origin and request.headers.get("referer"):
-        parsed = urlparse(request.headers.get("referer"))
-        origin = f"{parsed.scheme}://{parsed.netloc}"
-    client_origin = (origin or settings.frontend_origin).rstrip("/")
+    client_origin = settings.get_safe_frontend_origin(request)
 
     # Dispatch email
     sent = send_password_reset_email(email, raw_token, client_origin=client_origin)
@@ -885,8 +804,8 @@ def request_role_upgrade(request: Request, body: RoleUpgradeRequestIn, user=Depe
         super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
         subject = f"Action Required: Role Upgrade Request from {user_name} ({target_role.upper()})"
         
-        client_origin = request.headers.get("origin")
-        portal_url = (client_origin or os.getenv("FRONTEND_ORIGIN") or settings.frontend_origin or "https://bank-complaints-ai-desk.vercel.app").rstrip("/")
+        client_origin = settings.get_safe_frontend_origin(request)
+        portal_url = client_origin
 
         html_content = f"""<!DOCTYPE html>
 <html>
@@ -1083,19 +1002,19 @@ def approve_role_upgrade(request: Request, request_id: int, admin=Depends(requir
                 user_name = user_info.get("full_name") or target_email.split("@")[0]
                 admin_name = admin.get("full_name") or admin.get("email", "Admin")
                 subject = f"Role Upgrade Approved: Welcome to {new_role.upper()}"
-                portal_url = (request.headers.get("origin") or os.getenv("FRONTEND_ORIGIN") or settings.frontend_origin or "https://bank-complaints-ai-desk.vercel.app").rstrip("/")
+                portal_url = settings.get_safe_frontend_origin(request)
                 html_content = f"""
                 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
                     <div style="background: #1e3a8a; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
                         <h2 style="color: #ffffff; margin: 0; font-size: 20px;">Bank Complaint AI Desk</h2>
                     </div>
-                    <h3 style="color: #0f172a; margin-top: 0;">Congratulations, {user_name}!</h3>
+                    <h3 style="color: #0f172a; margin-top: 0;">Congratulations, {html.escape(user_name)}!</h3>
                     <p style="color: #334155; font-size: 15px; line-height: 1.5;">
-                        Your request to be promoted to <strong>{new_role.upper()}</strong> has been reviewed and <strong style="color: #16a34a;">APPROVED</strong> by administrator ({admin_name}).
+                        Your request to be promoted to <strong>{html.escape(new_role.upper())}</strong> has been reviewed and <strong style="color: #16a34a;">APPROVED</strong> by administrator ({html.escape(admin_name)}).
                     </p>
                     <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 14px; border-radius: 6px; margin: 18px 0;">
                         <p style="margin: 0; color: #166534; font-size: 14px;">
-                            <strong>New Role:</strong> {new_role.upper()}<br/>
+                            <strong>New Role:</strong> {html.escape(new_role.upper())}<br/>
                             <strong>Status:</strong> Active immediately
                         </p>
                     </div>

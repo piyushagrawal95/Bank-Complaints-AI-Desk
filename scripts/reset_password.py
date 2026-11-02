@@ -2,11 +2,15 @@
 import getpass
 import os
 import sys
+from pathlib import Path
 
 import psycopg
 from dotenv import load_dotenv
 
-sys.path.insert(0, "backend")
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root / "backend"))
+load_dotenv(project_root / "backend" / ".env")
+
 from app.security import hash_password  # noqa: E402
 
 
@@ -15,8 +19,6 @@ def main():
         raise SystemExit("Usage: python scripts/reset_password.py user@example.com")
     email = sys.argv[1].strip().lower()
 
-    from pathlib import Path
-load_dotenv(Path(__file__).resolve().parent.parent / "backend" / ".env")
     url = os.getenv("DATABASE_URL")
     if not url:
         raise SystemExit("DATABASE_URL is empty in backend/.env")

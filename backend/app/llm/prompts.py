@@ -109,15 +109,21 @@ RESPONSE_DRAFT_SYSTEM_PROMPT = (
 )
 
 
-def build_response_draft_user_prompt(complaint: dict, similar_cases: list[dict] | None = None, clean_narrative: str = "") -> str:
-    """Constructs the prompt containing the customer grievance and historical precedent resolutions."""
+def build_response_draft_user_prompt(
+    complaint: dict,
+    similar_cases: list[dict] | None = None,
+    clean_narrative: str = "",
+    custom_instructions: str | None = None,
+) -> str:
+    """Constructs the prompt containing the customer grievance, XML boundaries for injection defense, and agent guidance."""
+    sanitized_story = clean_narrative.replace("</customer_story>", "").strip()
     user_content = (
         f"Bank Customer Complaint Details:\n"
         f"Product: {complaint.get('product')}\n"
         f"Issue: {complaint.get('issue')}\n"
         f"Company: {complaint.get('company')}\n"
         f"Date Received: {complaint.get('date_received')}\n"
-        f"Customer Story:\n{clean_narrative}\n\n"
+        f"<customer_story>\n{sanitized_story}\n</customer_story>\n\n"
     )
 
     if similar_cases:
@@ -125,6 +131,10 @@ def build_response_draft_user_prompt(complaint: dict, similar_cases: list[dict] 
         for idx, sc in enumerate(similar_cases[:2], 1):
             resolution = sc.get("company_response_to_consumer") or "Closed with explanation"
             user_content += f"- Case {idx} Resolution: {resolution}\n"
+
+    if custom_instructions and custom_instructions.strip():
+        sanitized_instr = custom_instructions.strip().replace("</custom_instructions>", "")
+        user_content += f"\n<custom_instructions>\n{sanitized_instr}\n</custom_instructions>\n"
 
     user_content += "\nPlease write a natural, personal, human-written response letter without any asterisks, stars, or emojis."
     return user_content

@@ -1,3 +1,5 @@
+import os
+os.environ["TESTING"] = "1"
 """Automated integration tests for Bank Complaint AI API."""
 import sys
 from pathlib import Path
@@ -108,26 +110,13 @@ def test_google_login_invalid(client):
 
 
 def test_google_login_mock_token(client):
-    import time
-    import jwt
-    now = int(time.time())
-    token = jwt.encode(
-        {
-            "iss": "https://accounts.google.com",
-            "aud": "639319834126-b1ouen3no25o2elim13idbab182m3tjd.apps.googleusercontent.com",
-            "email": "test_google_runner@bank.com",
-            "name": "Test Google Runner",
-            "iat": now,
-            "exp": now + 3600,
-        },
-        "mock_secret_key_that_is_at_least_32_bytes_long",
-        algorithm="HS256",
-    )
-    res = client.post("/auth/google", json={"credential": token})
-    assert res.status_code == 200
-    data = res.json()
-    assert "access_token" in data
-    assert data["user"]["email"] == "test_google_runner@bank.com"
+    from unittest.mock import patch
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value={"email": "test_google_runner@bank.com", "name": "Test Google Runner"}):
+        res = client.post("/auth/google", json={"credential": "mock_valid_google_token"})
+        assert res.status_code == 200
+        data = res.json()
+        assert "access_token" in data
+        assert data["user"]["email"] == "test_google_runner@bank.com"
 
 
 

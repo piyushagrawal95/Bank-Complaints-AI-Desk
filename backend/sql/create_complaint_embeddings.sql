@@ -1,4 +1,6 @@
 -- Complaint embeddings for similar past complaints vector search
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE IF NOT EXISTS complaint_embeddings (
     complaint_id BIGINT PRIMARY KEY REFERENCES complaints(complaint_id) ON DELETE CASCADE,
     embedding vector(384) NOT NULL,

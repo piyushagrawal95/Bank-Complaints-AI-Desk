@@ -110,12 +110,18 @@ def clean_human_letter(text: str) -> str:
     return text
 
 
-def draft_reply(complaint: dict, similar_cases: list[dict] | None = None) -> str:
+def draft_reply(
+    complaint: dict,
+    similar_cases: list[dict] | None = None,
+    custom_instructions: str | None = None,
+) -> str:
     """Drafts an official bank response letter to a customer complaint."""
     narrative = (complaint.get("narrative") or "Customer reported: " + complaint.get("issue", "")).strip()
     clean_story = shorten(narrative)
 
-    user_content = build_response_draft_user_prompt(complaint, similar_cases, clean_story)
+    user_content = build_response_draft_user_prompt(
+        complaint, similar_cases, clean_story, custom_instructions=custom_instructions
+    )
 
     messages = [
         {"role": "system", "content": REPLY_SYSTEM_PROMPT},

@@ -2,11 +2,12 @@
 
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 import psycopg
 
-from pathlib import Path
-load_dotenv(Path(__file__).resolve().parent.parent / "backend" / ".env")
+project_root = Path(__file__).resolve().parent.parent
+load_dotenv(project_root / "backend" / ".env")
 
 db_url = os.getenv("DATABASE_URL")
 if not db_url:
@@ -37,6 +38,10 @@ def delete_user_by_email(email):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--all":
+        confirm = input("ARE YOU SURE you want to delete ALL users and password tokens? Type 'CONFIRM' to proceed: ")
+        if confirm.strip() != "CONFIRM":
+            print("Operation aborted. No users deleted.")
+            sys.exit(0)
         delete_all_users()
         show_users()
     elif len(sys.argv) > 1 and sys.argv[1].startswith("--email="):

@@ -56,40 +56,7 @@ def dispatch_email_transport(
         except Exception as exc:
             logger.warning(f"Brevo HTTPS dispatch failed for {to_email}: {exc}")
 
-    # 2. Vercel Serverless Function Relay (HTTPS Port 443 -> Vercel Node.js -> Gmail Port 465)
-    relay_urls = []
-    if client_origin and client_origin.startswith("http") and "localhost" not in client_origin and "127.0.0.1" not in client_origin:
-        relay_urls.append(f"{client_origin.rstrip('/')}/api/send-email")
-
-    vercel_url = os.getenv("VERCEL_URL", "").strip()
-    if vercel_url:
-        if not vercel_url.startswith("http"):
-            vercel_url = f"https://{vercel_url}"
-        cand = f"{vercel_url.rstrip('/')}/api/send-email"
-        if cand not in relay_urls:
-            relay_urls.append(cand)
-
-    for relay_url in relay_urls:
-        try:
-            payload = json.dumps({
-                "to_email": to_email,
-                "subject": subject,
-                "html": html_content,
-                "text": text_content,
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                relay_url,
-                data=payload,
-                headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                if resp.status in (200, 201):
-                    logger.info(f"Email successfully dispatched via Vercel Serverless Relay ({relay_url}) to {to_email}")
-                    return True
-        except Exception as exc:
-            logger.warning(f"Vercel serverless relay ({relay_url}) failed: {exc}")
-
+    # Direct secure transports: Brevo REST API -> Resend API -> SMTP
     # 3. Resend API (HTTPS Port 443)
     resend_key = (os.getenv("RESEND_API_KEY") or settings.resend_api_key or "").strip()
     if resend_key:
@@ -348,6 +315,14 @@ def send_supervisor_approval_request_email(
     """Dispatches a notification email to a supervisor when an agent requests resolution approval."""
     subject = f"Action Required: Complaint #{complaint_id} Pending Review ({company})"
 
+    safe_sup = html.escape(supervisor_name or 'Supervisor')
+    safe_agent = html.escape(agent_name or 'Agent')
+    safe_company = html.escape(company or 'Bank')
+    safe_product = html.escape(product or 'Service')
+    safe_issue = html.escape(issue or 'Customer Dispute')
+    safe_draft = html.escape(response_draft[:800])
+    portal_link = (settings.frontend_origin or "https://bank-complaints-ai-desk.vercel.app").rstrip('/')
+
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -371,8 +346,8 @@ def send_supervisor_approval_request_email(
       <div class="card">
         <span class="badge">Dispute Review Requested</span>
         <h1 class="title">Resolution Draft Awaiting Approval</h1>
-        <p>Dear {supervisor_name or 'Supervisor'},</p>
-        <p>Agent <strong>{agent_name}</strong> has submitted an official resolution draft for Complaint <strong>#{complaint_id}</strong>. Please log into the Bank Complaint AI Desk to review, customize if necessary, and formally approve the response.</p>
+        <p>Dear {safe_sup},</p>
+        <p>Agent <strong>{safe_agent}</strong> has submitted an official resolution draft for Complaint <strong>#{complaint_id}</strong>. Please log into the Bank Complaint AI Desk to review, customize if necessary, and formally approve the response.</p>
         
         <div class="meta-box">
           <div class="meta-row">
@@ -381,29 +356,29 @@ def send_supervisor_approval_request_email(
           </div>
           <div class="meta-row">
             <span class="meta-label">Bank / Institution:</span>
-            <span class="meta-value">{company}</span>
+            <span class="meta-value">{safe_company}</span>
           </div>
           <div class="meta-row">
             <span class="meta-label">Product:</span>
-            <span class="meta-value">{product}</span>
+            <span class="meta-value">{safe_product}</span>
           </div>
           <div class="meta-row">
             <span class="meta-label">Dispute Issue:</span>
-            <span class="meta-value">{issue}</span>
+            <span class="meta-value">{safe_issue}</span>
           </div>
           <div class="meta-row">
             <span class="meta-label">Submitted By:</span>
-            <span class="meta-value">{agent_name}</span>
+            <span class="meta-value">{safe_agent}</span>
           </div>
         </div>
 
         <p style="font-weight: 600; font-size: 14px; margin-bottom: 6px;">Draft Resolution Letter Preview:</p>
-        <div class="draft-preview">{response_draft[:800]}...</div>
+        <div class="draft-preview">{safe_draft}...</div>
 
         <p style="font-size: 14px; color: #475569;">Prompt approval ensures timely delivery to the consumer within mandatory regulatory windows (e.g. Regulation E / Z).</p>
 
         <div style="text-align: center; margin: 26px 0 20px;">
-          <a href="{client_origin or 'https://bank-complaints-ai-desk.vercel.app'}" style="display: inline-block; background-color: #1e40af; color: #ffffff; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25);">
+          <a href="{portal_link}" style="display: inline-block; background-color: #1e40af; color: #ffffff; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25);">
             👉 Log in to Approvals Portal
           </a>
         </div>
@@ -475,11 +450,11 @@ def send_agent_rejection_notification_email(
       <div class="card">
         <span class="badge">Revisions Requested</span>
         <h1 class="title">Resolution Draft Requires Update</h1>
-        <p>Dear {agent_name or 'Agent'},</p>
-        <p>Supervisor <strong>{supervisor_name}</strong> has reviewed your resolution draft for Complaint <strong>#{complaint_id}</strong> ({company}) and requested modifications before it can be approved for customer dispatch.</p>
+        <p>Dear {html.escape(agent_name or 'Agent')},</p>
+        <p>Supervisor <strong>{html.escape(supervisor_name or 'Supervisor')}</strong> has reviewed your resolution draft for Complaint <strong>#{complaint_id}</strong> ({html.escape(company or 'Bank')}) and requested modifications before it can be approved for customer dispatch.</p>
         
         <p style="font-weight: 600; font-size: 14px; margin-bottom: 6px;">Supervisor Feedback & Instructions:</p>
-        <div class="feedback-box">{reason}</div>
+        <div class="feedback-box">{html.escape(reason or '')}</div>
 
         <p style="font-size: 14px; color: #475569;">Please log into the Bank Complaint AI Desk, update your draft according to the feedback above, and re-submit it for approval.</p>
 

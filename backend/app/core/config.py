@@ -51,7 +51,36 @@ class Settings(BaseSettings):
     turnstile_secret_key: str = os.getenv("TURNSTILE_SECRET_KEY", "")
 
 
+    environment: str = os.getenv("ENVIRONMENT", "production")
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        raw_list = []
+        if self.cors_origins:
+            raw_list.extend([o.strip() for o in self.cors_origins.split(",") if o.strip()])
+        if self.frontend_origin:
+            raw_list.append(self.frontend_origin.strip().rstrip("/"))
+        raw_list.extend([
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:5175",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174",
+            "http://127.0.0.1:5175",
+            "https://bank-complaints-ai-desk.vercel.app",
+        ])
+        return list(dict.fromkeys(raw_list))
+
+    def get_safe_frontend_origin(self, request=None) -> str:
+        """Returns a verified, whitelisted frontend origin. Never trusts arbitrary Origin/Host headers."""
+        if request:
+            req_origin = (request.headers.get("origin") or "").strip().rstrip("/")
+            if req_origin in self.allowed_origins:
+                return req_origin
+        return (self.frontend_origin or "https://bank-complaints-ai-desk.vercel.app").rstrip("/")
+
     model_config = SettingsConfigDict(extra="ignore")
+
 
 
 settings = Settings()

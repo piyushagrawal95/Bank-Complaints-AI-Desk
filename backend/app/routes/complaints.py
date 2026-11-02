@@ -7,7 +7,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from app.core.config import settings
 from app.db import pool
-from app.deps import get_current_user
+from app.deps import get_current_user, require_role
 from app.email_service import send_complaint_approval_email, send_supervisor_approval_request_email, send_agent_rejection_notification_email
 from app.file_extractor import extract_raw_text, parse_complaint_from_text, extract_complaints_from_file
 from app.llm.analysis import (
@@ -252,7 +252,7 @@ def create_complaint(body: CreateComplaintIn, user: dict = Depends(get_current_u
 
 
 @router.get("/pending-approvals")
-def list_pending_approvals(user=Depends(get_current_user)):
+def list_pending_approvals(user=Depends(require_role("supervisor", "admin"))):
     """Lists all complaints with draft responses currently awaiting approval.
     Supervisors see their assigned agents' requests (+ unassigned); Admins see all.
     """
@@ -524,10 +524,15 @@ def batch_create_complaints(
 
 
 @router.put("/{complaint_id}/email")
-def update_complaint_email(complaint_id: int, body: UpdateEmailIn):
+def update_complaint_email(complaint_id: int, body: UpdateEmailIn, user=Depends(get_current_user)):
     """Updates or adds the consumer email address for an existing complaint."""
     try:
         with pool.connection() as conn:
+            # Prevent altering email on already dispatched complaints
+            resp = conn.execute("SELECT status FROM complaint_responses WHERE complaint_id = %s", [complaint_id]).fetchone()
+            if resp and resp.get("status") == "dispatched":
+                raise HTTPException(status_code=400, detail="Cannot alter customer email: resolution letter has already been dispatched.")
+
             row = conn.execute(
                 "UPDATE complaints SET consumer_email = %s WHERE complaint_id = %s "
                 "RETURNING complaint_id, consumer_email",
@@ -658,21 +663,24 @@ def draft_complaint_reply(complaint_id: int, body: DraftReplyIn | None = None):
             complaint = conn.execute(
                 "SELECT * FROM complaints WHERE complaint_id = %s", [complaint_id]
             ).fetchone()
+            if not complaint:
+                raise HTTPException(status_code=404, detail="Complaint not found")
+
             similar = conn.execute(
                 "SELECT company_response_to_consumer FROM complaints "
                 "WHERE product = %s AND complaint_id != %s AND company_response_to_consumer IS NOT NULL "
                 "LIMIT 3",
                 [complaint["product"], complaint_id],
             ).fetchall()
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Database error while drafting reply")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
-    if not complaint:
-        raise HTTPException(status_code=404, detail="Complaint not found")
-
+    custom_instr = body.custom_instructions if body else None
     try:
-        letter = draft_reply(complaint, similar)
+        letter = draft_reply(complaint, similar, custom_instructions=custom_instr)
     except LLMError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
@@ -705,6 +713,22 @@ def request_approval(
             ).fetchone()
             if not complaint:
                 raise HTTPException(status_code=404, detail="Complaint not found")
+
+            existing_resp = conn.execute(
+                "SELECT status, requested_by_id FROM complaint_responses WHERE complaint_id = %s",
+                [complaint_id]
+            ).fetchone()
+            if existing_resp:
+                if existing_resp.get("status") in ("approved", "dispatched"):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot request approval: this dispute response has already been {existing_resp.get('status')}.",
+                    )
+                if user_role == "agent" and existing_resp.get("requested_by_id") and existing_resp["requested_by_id"] != user_id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Another agent has already submitted a resolution draft for this complaint.",
+                    )
 
             # Check if this agent is assigned to a specific supervisor
             agent_user = conn.execute("SELECT supervisor_id FROM users WHERE id = %s", [user_id]).fetchone()
@@ -769,7 +793,7 @@ def request_approval(
         raise HTTPException(status_code=503, detail="Database error submitting response for approval.")
 
     # Dispatch email notifications in background task without blocking the response
-    client_origin = request.headers.get("origin")
+    client_origin = settings.get_safe_frontend_origin(request)
     for sup in supervisors_to_notify:
         background_tasks.add_task(
             send_supervisor_approval_request_email,
@@ -793,7 +817,7 @@ def reject_response(
     body: RejectResponseIn,
     request: Request,
     background_tasks: BackgroundTasks,
-    user=Depends(get_current_user),
+    user=Depends(require_role("supervisor", "admin")),
 ):
     """Supervisor/Admin action: Rejects resolution draft with feedback notes sent back to agent."""
     user_role = user.get("role", "agent")
@@ -806,21 +830,35 @@ def reject_response(
     user_name = user.get("full_name") or user.get("email")
     user_id = user.get("id")
 
-    sql = """
-        UPDATE complaint_responses
-        SET status = 'rejected',
-            rejection_reason = %s,
-            rejected_by_id = %s,
-            rejected_by_name = %s,
-            rejected_at = now()
-        WHERE complaint_id = %s
-        RETURNING complaint_id, status, rejection_reason, rejected_by_name, rejected_at, requested_by_id;
-    """
     try:
         with pool.connection() as conn:
-            row = conn.execute(sql, [body.reason, user_id, user_name, complaint_id]).fetchone()
-            if not row:
+            existing = conn.execute(
+                "SELECT status, assigned_to_id, requested_by_id FROM complaint_responses WHERE complaint_id = %s",
+                [complaint_id]
+            ).fetchone()
+            if not existing:
                 raise HTTPException(status_code=404, detail="Complaint response record not found.")
+            if existing["status"] != "pending_approval":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot reject response: current status is '{existing['status']}'. Only pending approval responses can be rejected.",
+                )
+            if not is_admin:
+                assigned_to = existing.get("assigned_to_id")
+                if assigned_to and assigned_to != user_id:
+                    raise HTTPException(status_code=403, detail="Access denied: This complaint is assigned to another supervisor.")
+
+            sql = """
+                UPDATE complaint_responses
+                SET status = 'rejected',
+                    rejection_reason = %s,
+                    rejected_by_id = %s,
+                    rejected_by_name = %s,
+                    rejected_at = now()
+                WHERE complaint_id = %s
+                RETURNING complaint_id, status, rejection_reason, rejected_by_name, rejected_at, requested_by_id;
+            """
+            row = conn.execute(sql, [body.reason, user_id, user_name, complaint_id]).fetchone()
 
             complaint = conn.execute(
                 "SELECT company, product, issue FROM complaints WHERE complaint_id = %s",
@@ -865,7 +903,7 @@ def approve_response(
     body: ApproveResponseIn,
     request: Request,
     background_tasks: BackgroundTasks,
-    user=Depends(get_current_user),
+    user=Depends(require_role("supervisor", "admin")),
 ):
     """Supervisor/Admin action: Approves resolution response and asynchronously dispatches email to consumer."""
     user_role = user.get("role", "agent")
@@ -889,6 +927,20 @@ def approve_response(
             ).fetchone()
             if not complaint:
                 raise HTTPException(status_code=404, detail="Complaint not found")
+
+            existing_resp = conn.execute(
+                "SELECT status, assigned_to_id, requested_by_id FROM complaint_responses WHERE complaint_id = %s",
+                [complaint_id]
+            ).fetchone()
+            if existing_resp and existing_resp.get("status") in ("approved", "dispatched"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Response has already been {existing_resp.get('status')}. Duplicate approval is prevented.",
+                )
+            if not is_admin and existing_resp:
+                assigned_to = existing_resp.get("assigned_to_id")
+                if assigned_to and assigned_to != user_id:
+                    raise HTTPException(status_code=403, detail="Access denied: This complaint is assigned to another supervisor.")
 
             # If supervisor provided or updated the consumer email, update complaints table
             target_email = (body.consumer_email or "").strip().lower() if body.consumer_email else (complaint.get("consumer_email") or "").strip().lower()
@@ -930,7 +982,7 @@ def approve_response(
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
     # Schedule background dispatch of resolution email so supervisor response is instant (<100ms)
-    client_origin = request.headers.get("origin")
+    client_origin = settings.get_safe_frontend_origin(request)
     if target_email:
         background_tasks.add_task(
             dispatch_approval_email_task,
@@ -964,17 +1016,29 @@ def approve_response(
 
 
 @router.post("/{complaint_id}/dispatch")
-def dispatch_response(complaint_id: int, user=Depends(get_current_user)):
+def dispatch_response(complaint_id: int, user=Depends(require_role("supervisor", "admin"))):
     """Marks an approved response as dispatched to the customer."""
     try:
         with pool.connection() as conn:
-            row = conn.execute(
-                "UPDATE complaint_responses SET status = 'dispatched', dispatched_at = now() "
-                "WHERE complaint_id = %s RETURNING complaint_id, status, dispatched_at, approved_by_name, approved_by_role",
+            existing = conn.execute(
+                "SELECT status, approved_by_name FROM complaint_responses WHERE complaint_id = %s",
                 [complaint_id],
             ).fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="No approved response found for this complaint.")
+            if not existing:
+                raise HTTPException(status_code=404, detail="No response found for this complaint.")
+            if existing["status"] == "dispatched":
+                raise HTTPException(status_code=400, detail="Response has already been dispatched to customer.")
+            if existing["status"] != "approved":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot dispatch response: status is '{existing['status']}'. It must be formally approved first.",
+                )
+
+            row = conn.execute(
+                "UPDATE complaint_responses SET status = 'dispatched', dispatched_at = now() "
+                "WHERE complaint_id = %s AND status = 'approved' RETURNING complaint_id, status, dispatched_at, approved_by_name, approved_by_role",
+                [complaint_id],
+            ).fetchone()
             return row
     except HTTPException:
         raise

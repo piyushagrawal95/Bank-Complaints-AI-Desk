@@ -1,3 +1,4 @@
+import os
 import base64
 import hashlib
 import hmac
@@ -119,8 +120,9 @@ def verify_captcha_challenge(captcha_token: str | None, user_answer: str | None)
     if not user_ans:
         return False, "CAPTCHA answer cannot be blank."
 
-    # Allow designated test bypass token for automated test suites
-    if captcha_token == "TEST_CAPTCHA_BYPASS":
+    # Allow designated test bypass token ONLY in automated test environment (never in production)
+    is_test_env = (os.getenv("TESTING") == "1" or getattr(settings, "environment", "") == "test")
+    if is_test_env and captcha_token == "TEST_CAPTCHA_BYPASS":
         if user_ans in ("bypass", "test", "42"):
             return True, ""
         return False, "Invalid test CAPTCHA answer."
@@ -157,7 +159,8 @@ def verify_turnstile_token(token: str | None, client_ip: str | None = None) -> t
     if not token or not token.strip():
         return False, "Security verification (Turnstile CAPTCHA) is required."
 
-    if token.strip() in ("TEST_CAPTCHA_BYPASS", "test_turnstile_mock_success"):
+    is_test_env = (os.getenv("TESTING") == "1" or getattr(settings, "environment", "") == "test")
+    if is_test_env and token.strip() in ("TEST_CAPTCHA_BYPASS", "test_turnstile_mock_success"):
         return True, ""
 
     secret = (settings.turnstile_secret_key or "").strip()
