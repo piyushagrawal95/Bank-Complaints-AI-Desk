@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import html
 import hashlib
 import logging
 import os
@@ -406,8 +407,9 @@ def dispatch_email_transport(to_email: str, subject: str, html_content: str, tex
             sender_email = (os.getenv("BREVO_SENDER_EMAIL") or settings.brevo_sender_email or "").strip()
             if not sender_email:
                 raise ValueError("BREVO_SENDER_EMAIL is not configured in .env")
+            sender_name = (os.getenv("BREVO_SENDER_NAME") or getattr(settings, "brevo_sender_name", None) or "Piyush Agrawal — Bank Complaint AI Desk").strip()
             payload = json.dumps({
-                "sender": {"name": "Bank Complaint AI Desk", "email": sender_email},
+                "sender": {"name": sender_name, "email": sender_email},
                 "to": [{"email": to_email}],
                 "subject": subject,
                 "htmlContent": html_content,
@@ -973,7 +975,7 @@ To review and approve or reject this request, please log in below:
 """
         dispatch_email_transport(super_admin, subject, html_content, plain_content, client_origin=client_origin)
     except Exception as email_err:
-        logger.warning(f"Could not dispatch email notification for role upgrade: {email_err}")
+        logger.exception(f"Could not dispatch email notification for role upgrade: {email_err}")
 
     return {
         "message": f"Role upgrade request for {target_role.upper()} submitted successfully! It is now pending Admin approval.",
