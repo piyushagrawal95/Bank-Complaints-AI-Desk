@@ -61,6 +61,7 @@ def validate_strong_password(v: str) -> str:
 class SignupIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    confirm_password: str | None = None
     full_name: str | None = Field(default=None, max_length=100)
     turnstile_token: str | None = None
     captcha_token: str | None = None
@@ -75,6 +76,7 @@ class SignupIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str = Field(max_length=128)
+    confirm_password: str | None = None
     turnstile_token: str | None = None
     captcha_token: str | None = None
     captcha_answer: str | None = None
@@ -87,6 +89,7 @@ class ForgotPasswordIn(BaseModel):
 class ResetPasswordIn(BaseModel):
     token: str = Field(min_length=10)
     new_password: str = Field(min_length=8, max_length=128)
+    confirm_password: str | None = None
 
     @field_validator("new_password")
     @classmethod
@@ -126,6 +129,9 @@ def signup(body: SignupIn, request: Request):
     )
     if not is_valid:
         raise HTTPException(status_code=400, detail=err_msg)
+
+    if body.confirm_password and body.confirm_password != body.password:
+        raise HTTPException(status_code=400, detail="Passwords do not match.")
 
     email = body.email.lower()
     super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
@@ -232,6 +238,9 @@ def login(body: LoginIn, request: Request):
     )
     if not is_valid:
         raise HTTPException(status_code=400, detail=err_msg)
+
+    if body.confirm_password and body.confirm_password != body.password:
+        raise HTTPException(status_code=400, detail="Passwords do not match.")
 
     email = body.email.lower()
     try:
@@ -673,6 +682,8 @@ def forgot_password(body: ForgotPasswordIn, request: Request):
 @router.post("/reset-password")
 def reset_password(body: ResetPasswordIn):
     """Resets user password using the verified reset token."""
+    if body.confirm_password and body.confirm_password != body.new_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match.")
     token_hash = hashlib.sha256(body.token.strip().encode("utf-8")).hexdigest()
     now = datetime.now(timezone.utc)
 

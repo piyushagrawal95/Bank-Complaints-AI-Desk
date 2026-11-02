@@ -135,12 +135,13 @@ export const login = (email, password, turnstile_token = null, captcha_token = n
     },
   });
 
-export const signup = (email, password, fullName, turnstile_token = null, captcha_token = null, captcha_answer = null) =>
+export const signup = (email, password, fullName, turnstile_token = null, captcha_token = null, captcha_answer = null, confirm_password = null) =>
   request("/auth/signup", {
     method: "POST",
     body: {
       email,
       password,
+      confirm_password: confirm_password || password,
       full_name: fullName || null,
       turnstile_token: turnstile_token || null,
       captcha_token: captcha_token || null,
@@ -151,8 +152,15 @@ export const signup = (email, password, fullName, turnstile_token = null, captch
 export const forgotPassword = (email) =>
   request("/auth/forgot-password", { method: "POST", body: { email } });
 
-export const resetPassword = (token, new_password) =>
-  request("/auth/reset-password", { method: "POST", body: { token, new_password } });
+export const resetPassword = (token, new_password, confirm_password = null) =>
+  request("/auth/reset-password", {
+    method: "POST",
+    body: {
+      token,
+      new_password,
+      confirm_password: confirm_password || new_password,
+    },
+  });
 
 export const getMe = () => request("/auth/me");
 

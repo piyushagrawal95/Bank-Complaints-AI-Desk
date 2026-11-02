@@ -642,6 +642,18 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const resetTok = params.get("reset_token") || params.get("token");
+    if (resetTok) {
+      setAuthModal("reset");
+    }
+    const verifyTok = params.get("verify_email");
+    if (verifyTok) {
+      setAuthModal("login");
+    }
+  }, []);
+
+  useEffect(() => {
     if (!getToken()) return;
     getMe()
       .then(setUser)
@@ -689,6 +701,10 @@ function App() {
     clearToken();
     setUser(null);
     setView("complaints");
+    setAuthModal(null);
+    if (window.location.search) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }
 
   if (checking) {
@@ -710,7 +726,14 @@ function App() {
   if (!user) {
     return (
       <>
-        <LandingPage onOpenAuth={(mode) => setAuthModal(mode || "login")} />
+        <LandingPage
+          onOpenAuth={(mode) => {
+            if (window.location.search) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            setAuthModal(mode || "login");
+          }}
+        />
         {authModal && (
           <div
             className="auth-modal-backdrop"

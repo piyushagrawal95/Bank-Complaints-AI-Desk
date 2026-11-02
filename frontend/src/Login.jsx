@@ -33,13 +33,21 @@ function EyeIcon({ off }) {
 function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
   const [mode, setMode] = useState(initialMode);
   useEffect(() => {
-    if (initialMode) setMode(initialMode);
+    if (initialMode) {
+      setMode(initialMode);
+      setError(null);
+      setSuccess(null);
+      setPassword("");
+      setConfirmPassword("");
+    }
   }, [initialMode]); // "login", "signup", "forgot", "reset"
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState(null);
@@ -157,6 +165,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
     if (token) {
       setResetToken(token);
       setMode("reset");
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     const verifyToken = params.get("verify_email");
@@ -288,6 +297,14 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
     }
 
     if (mode === "signup" || mode === "reset") {
+      if (!confirmPassword) {
+        setError(mode === "reset" ? "Please confirm your new password." : "Please confirm your password.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match. Please verify your confirm password.");
+        return;
+      }
       if (!passwordChecks.minLength) {
         setError("Password must be at least 8 characters long.");
         return;
@@ -320,7 +337,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
     try {
       if (mode === "signup") {
         setLoadingMessage("Creating your bank desk account...");
-        const res = await signup(email, password, fullName, turnstileToken);
+        const res = await signup(email, password, fullName, turnstileToken, null, null, confirmPassword);
 
         if (!res.email_sent && res.dev_verification_link) {
           try {
@@ -355,6 +372,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
 
         setMode("login");
         setPassword("");
+        setConfirmPassword("");
         setFullName("");
         setEmail("");
         setSuccess(res.message || "Account created successfully! A confirmation email has been sent to your inbox.");
@@ -372,10 +390,12 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
         setEmail("");
       } else if (mode === "reset") {
         setLoadingMessage("Updating and securing your password...");
-        const res = await resetPassword(resetToken, password);
+        const res = await resetPassword(resetToken, password, confirmPassword);
         setMode("login");
         setPassword("");
+        setConfirmPassword("");
         setResetToken("");
+        window.history.replaceState({}, document.title, window.location.pathname);
         setSuccess(res.message || "Password updated successfully! You can now sign in with your new password.");
       }
     } catch (err) {
@@ -448,6 +468,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
                   setSuccess(null);
                   setEmail("");
                   setPassword("");
+                  setConfirmPassword("");
                 }}
               >
                 Sign In
@@ -461,6 +482,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
                   setSuccess(null);
                   setEmail("");
                   setPassword("");
+                  setConfirmPassword("");
                   setFullName("");
                 }}
               >
@@ -636,6 +658,43 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
               </div>
             )}
 
+            {(mode === "signup" || mode === "reset") && (
+              <div className="auth-field">
+                <div className="auth-label-row">
+                  <label>{mode === "reset" ? "Confirm New Password" : "Confirm Password"}</label>
+                  {confirmPassword.length > 0 && (
+                    <span
+                      className={`match-status-badge ${password === confirmPassword ? "matched" : "unmatched"}`}
+                    >
+                      {password === confirmPassword ? "✓ Passwords match" : "✕ Passwords do not match"}
+                    </span>
+                  )}
+                </div>
+                <div className="auth-password">
+                  <input
+                    className={`auth-input ${confirmPassword.length > 0 && password !== confirmPassword ? "auth-input-error" : ""}`}
+                    type={showConfirmPassword ? "text" : "password"}
+                    required
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                    readOnly
+                    onFocus={(e) => e.target.removeAttribute("readonly")}
+                    name="clean_confirm_password_field"
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    <EyeIcon off={showConfirmPassword} />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {(mode === "login" || mode === "signup") && (
               <div className="turnstile-container">
                 <div ref={turnstileRef} className="turnstile-slot"></div>
@@ -754,6 +813,9 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
                   setSuccess(null);
                   setEmail("");
                   setPassword("");
+                  setConfirmPassword("");
+                  setResetToken("");
+                  window.history.replaceState({}, document.title, window.location.pathname);
                 }}
               >
                 ← Back to Sign In

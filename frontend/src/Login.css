@@ -713,3 +713,31 @@ input[type="password"]::-ms-clear {
   align-items: center;
   width: 100%;
 }
+
+
+/* Password Match Indicator & Error Input */
+.match-status-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.match-status-badge.matched {
+  color: #16a34a;
+}
+
+.match-status-badge.unmatched {
+  color: #dc2626;
+}
+
+.auth-input.auth-input-error {
+  border-color: #ef4444;
+}
+
+.auth-input.auth-input-error:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
