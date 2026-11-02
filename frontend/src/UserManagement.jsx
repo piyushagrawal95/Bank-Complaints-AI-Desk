@@ -169,7 +169,7 @@ function UserManagement({ currentUser }) {
         <div>
           <h2>User Role & Access Management</h2>
           <p className="users-subtitle">
-            Admin Portal: Manage user permissions, enforce max 50 agents per supervisor hierarchy, and review promotions.
+            Admin Portal: Manage user permissions, team hierarchies, and review promotions.
           </p>
         </div>
         <button className="secondary refresh-btn" onClick={loadUsers} disabled={loading}>
@@ -251,7 +251,7 @@ function UserManagement({ currentUser }) {
       {supervisors.length > 0 && (
         <div className="supervisor-capacity-section">
           <div className="capacity-section-head">
-            <h3>Supervisor Team Capacity (Max 50 Agents per Supervisor)</h3>
+            <h3>Team Supervision Capacity (Max 50 Agents per Supervisor)</h3>
             <span className="capacity-subtitle">
               Approval requests from agents are automatically routed to their assigned supervisor.
             </span>
@@ -299,7 +299,7 @@ function UserManagement({ currentUser }) {
                 <th>Name</th>
                 <th>Email Address</th>
                 <th>Current Role</th>
-                <th>Assigned Supervisor</th>
+                <th>Assigned Supervisor / Lead</th>
                 <th>Status</th>
                 <th>Change Role</th>
               </tr>

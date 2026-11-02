@@ -131,7 +131,7 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
             <IconShield size={24} />
           </div>
           <div>
-            <h2>Supervisor Resolution Approvals</h2>
+            <h2>Resolution Approvals</h2>
             <p className="subtitle">
               Review and formally sign off on agent-drafted resolution letters. Approving dispatches the official notice directly to the consumer's email address.
             </p>
@@ -155,7 +155,7 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
       {loading ? (
         <div className="approvals-loading-box">
           <div className="app-init-spinner"></div>
-          <p>Loading pending supervisor approval requests...</p>
+          <p>Loading pending resolution approval requests...</p>
         </div>
       ) : pendingList.length === 0 ? (
         <div className="approvals-empty-card">
@@ -164,7 +164,7 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
           </div>
           <h3>Queue is Clean & Up to Date</h3>
           <p className="empty-sub">
-            There are currently no agent resolution letters awaiting supervisor approval in your queue.
+            There are currently no agent resolution letters awaiting approval in your queue.
           </p>
           <button className="btn-secondary" onClick={loadPending}>
             Recheck Queue
@@ -220,7 +220,7 @@ export default function ApprovalsPortal({ onViewComplaint, onRefreshCount }) {
                     )}
                     {item.assigned_to_name && (
                       <div className="meta-col">
-                        <span className="meta-lbl">Assigned Supervisor:</span>
+                        <span className="meta-lbl">Assigned Reviewer:</span>
                         <span className="meta-val supervisor-badge">
                           {item.assigned_to_name}
                         </span>

@@ -25,12 +25,12 @@ const US_STATES = [
 ];
 
 const INITIAL_FORM = {
-  product: "Checking or savings account",
+  product: "",
   sub_product: "",
   issue: "",
   sub_issue: "",
-  company: "JPMorgan Chase & Co.",
-  state: "NY",
+  company: "",
+  state: "",
   zip_code: "",
   consumer_email: "",
   narrative: "",
@@ -464,6 +464,7 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
                   onChange={(e) => handleChange("product", e.target.value)}
                   required
                 >
+                  <option value="" disabled>-- Select Product Vertical --</option>
                   {STANDARD_PRODUCTS.map((prod) => (
                     <option key={prod} value={prod}>
                       {prod}
@@ -508,7 +509,7 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
                 <label>Financial Institution / Bank *</label>
                 <input
                   type="text"
-                  placeholder="e.g. JPMorgan Chase & Co., Wells Fargo"
+                  placeholder="e.g. JPMorgan Chase & Co., Wells Fargo, Bank of America, Citibank"
                   value={form.company}
                   onChange={(e) => handleChange("company", e.target.value)}
                   required
@@ -521,7 +522,7 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
                 </label>
                 <input
                   type="email"
-                  placeholder="customer@example.com"
+                  placeholder="e.g. customer@example.com"
                   value={form.consumer_email}
                   onChange={(e) => handleChange("consumer_email", e.target.value)}
                   className="email-input-field"
@@ -535,6 +536,7 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
                   value={form.state}
                   onChange={(e) => handleChange("state", e.target.value)}
                 >
+                  <option value="">-- Select State (Optional) --</option>
                   {US_STATES.map((st) => (
                     <option key={st} value={st}>
                       {st}
@@ -547,7 +549,7 @@ export default function NewComplaint({ onViewComplaint, onGoToComplaints }) {
                 <label>ZIP Code</label>
                 <input
                   type="text"
-                  placeholder="e.g. 10001"
+                  placeholder="e.g. 10001, 90210"
                   value={form.zip_code}
                   onChange={(e) => handleChange("zip_code", e.target.value)}
                   maxLength={10}
