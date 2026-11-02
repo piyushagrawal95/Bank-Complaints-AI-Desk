@@ -48,6 +48,10 @@ async function request(path, { method = "GET", params = {}, body, timeout } = {}
       ? 55000
       : 22000;
 
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    throw new Error("You are not connected to Internet. Please check your network connection and click Retry.");
+  }
+
   const timeoutMs = timeout || defaultTimeout;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

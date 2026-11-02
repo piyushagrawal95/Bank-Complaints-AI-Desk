@@ -1,0 +1,241 @@
+/* ==========================================================================
+   OFFLINE NOTICE / INTERNET DISCONNECTED BANNER & MODAL
+   ========================================================================== */
+
+/* Top edge accent indicator */
+.offline-top-stripe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #dc2626, #ef4444, #f97316, #ef4444, #dc2626);
+  background-size: 200% 100%;
+  animation: offlineStripeGlow 2.5s ease infinite;
+  z-index: 1000000;
+}
+
+.offline-top-stripe.stripe-restored {
+  background: linear-gradient(90deg, #16a34a, #22c55e, #10b981);
+}
+
+@keyframes offlineStripeGlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Floating Banner Container */
+.offline-notice-wrapper {
+  position: fixed;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999999;
+  width: calc(100% - 2rem);
+  max-width: 600px;
+  pointer-events: none;
+  animation: offlineSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes offlineSlideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+/* Main Card */
+.offline-notice-card {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #fecaca;
+  border-left: 5px solid #dc2626;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  box-shadow: 
+    0 12px 32px -4px rgba(220, 38, 38, 0.18),
+    0 4px 12px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(220, 38, 38, 0.08);
+  transition: all 0.25s ease;
+}
+
+/* Restored state card */
+.offline-notice-card.restored-card {
+  border-color: #bbf7d0;
+  border-left-color: #16a34a;
+  box-shadow: 
+    0 12px 32px -4px rgba(22, 163, 74, 0.18),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+/* Icon circles */
+.offline-notice-icon-circle {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.offline-notice-icon-circle.danger-circle {
+  background: #fee2e2;
+  color: #dc2626;
+  box-shadow: 0 0 0 4px rgba(254, 226, 226, 0.6);
+  animation: dangerPulse 2s infinite ease-in-out;
+}
+
+.offline-notice-icon-circle.success-circle {
+  background: #dcfce7;
+  color: #16a34a;
+  box-shadow: 0 0 0 4px rgba(220, 252, 231, 0.6);
+}
+
+@keyframes dangerPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
+/* Content Area */
+.offline-notice-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.offline-notice-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+  flex-wrap: wrap;
+}
+
+.offline-status-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.offline-notice-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.offline-notice-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* Action Area */
+.offline-notice-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.offline-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.offline-retry-btn:hover:not(:disabled) {
+  background: #b91c1c;
+  box-shadow: 0 4px 10px rgba(185, 28, 28, 0.35);
+  transform: translateY(-1px);
+}
+
+.offline-retry-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.offline-retry-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+/* Loading spin animation */
+.offline-spin {
+  animation: offlineSpin 0.8s linear infinite;
+}
+
+@keyframes offlineSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 580px) {
+  .offline-notice-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .offline-notice-icon-circle {
+    width: 36px;
+    height: 36px;
+  }
+
+  .offline-notice-actions {
+    width: 100%;
+  }
+
+  .offline-retry-btn {
+    width: 100%;
+    padding: 0.6rem 1rem;
+  }
+}
