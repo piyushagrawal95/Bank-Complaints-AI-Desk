@@ -295,20 +295,33 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
                       </button>
                     </span>
                   ) : (
-                    <span>
+                    <span className="email-display-group">
                       {complaint.consumer_email ? (
-                        <span className="email-chip"><IconMail size={12} /> {complaint.consumer_email}</span>
+                        <span className="email-chip">
+                          <IconMail size={13} /> {complaint.consumer_email}
+                        </span>
                       ) : (
                         <span className="email-empty">(No email recorded)</span>
                       )}
                       <button
+                        type="button"
                         className="btn-edit-email-link"
                         onClick={() => {
                           setEmailInput(complaint.consumer_email || "");
                           setIsEditingEmail(true);
                         }}
                       >
-                        {complaint.consumer_email ? "Edit" : "+ Add Email"}
+                        {complaint.consumer_email ? (
+                          <>
+                            <IconEdit size={13} />
+                            <span>Edit</span>
+                          </>
+                        ) : (
+                          <>
+                            <IconMail size={13} />
+                            <span>+ Add Email</span>
+                          </>
+                        )}
                       </button>
                     </span>
                   )}
