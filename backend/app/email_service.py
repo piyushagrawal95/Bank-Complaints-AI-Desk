@@ -1,6 +1,9 @@
+from datetime import datetime
+import html
 import json
 import logging
 import os
+import re
 import smtplib
 import ssl
 import urllib.request
@@ -198,100 +201,128 @@ def send_complaint_approval_email(
     resolution_text: str,
     client_origin: str | None = None,
 ) -> bool:
-    """Sends official resolution approval notification to the consumer."""
-    subject = f"Official Resolution Notice — Bank Complaint #{complaint_id}"
+    """Sends official resolution approval notification to the consumer in a unified bank letterhead format."""
+    inst_name = (company or "Financial Institution").strip()
+    prod_name = (product or "Banking Service").strip()
+    issue_name = (issue or "Consumer Grievance").strip()
+    current_date_str = datetime.now().strftime("%B %d, %Y")
+    subject = f"Official Dispute Resolution Notice — {inst_name} [Ref: #{complaint_id}]"
 
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #f8fafc; margin: 0; padding: 24px; }}
-        .card {{ max-width: 620px; margin: 0 auto; background: #131d33; border: 1px solid #1e293b; border-radius: 12px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }}
-        .header {{ display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #1e293b; padding-bottom: 20px; margin-bottom: 24px; }}
-        .badge {{ background: #059669; color: #ecfdf5; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; display: inline-block; }}
-        .title {{ font-size: 20px; font-weight: 700; color: #ffffff; margin: 0; }}
-        .meta-box {{ background: #0b1120; border-radius: 8px; padding: 16px; margin-bottom: 24px; font-size: 14px; border: 1px solid #1e293b; }}
-        .meta-row {{ display: flex; justify-content: space-between; margin-bottom: 8px; }}
-        .meta-row:last-child {{ margin-bottom: 0; }}
-        .meta-label {{ color: #94a3b8; font-weight: 500; }}
-        .meta-value {{ color: #f1f5f9; font-weight: 600; }}
-        .resolution-box {{ background: #0f172a; border-left: 4px solid #10b981; border-radius: 6px; padding: 20px; color: #e2e8f0; font-size: 15px; line-height: 1.6; white-space: pre-wrap; margin-bottom: 24px; font-family: 'Courier New', Courier, monospace; }}
-        .footer {{ font-size: 12px; color: #64748b; border-top: 1px solid #1e293b; padding-top: 20px; line-height: 1.5; }}
-      </style>
-    </head>
-    <body>
-      <div class="card">
-        <div class="header">
-          <div>
-            <div class="badge">Official Compliance Resolution</div>
-            <h1 class="title" style="margin-top: 8px;">Bank Complaint Resolution Approved</h1>
-          </div>
-        </div>
+    clean_text = (resolution_text or "").strip()
+    # Check if the letter already begins with a formal greeting
+    has_greeting = bool(re.match(r"(?i)^(dear|hello|to\s+whom|attention|greetings)", clean_text))
 
-        <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">
-          Dear Customer,
-        </p>
-        <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">
-          We are writing to inform you that your dispute submitted under <strong>Complaint #{complaint_id}</strong> has been thoroughly investigated and formally approved by bank compliance leadership.
-        </p>
+    # Convert paragraphs into clean HTML paragraphs
+    raw_paragraphs = [p.strip() for p in clean_text.split("\n\n") if p.strip()]
+    if not has_greeting and raw_paragraphs:
+        raw_paragraphs.insert(0, "Dear Customer,")
 
-        <div class="meta-box">
-          <div class="meta-row">
-            <span class="meta-label">Complaint Reference:</span>
-            <span class="meta-value">#{complaint_id}</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Financial Institution:</span>
-            <span class="meta-value">{company}</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Product / Service:</span>
-            <span class="meta-value">{product}</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Dispute Issue:</span>
-            <span class="meta-value">{issue}</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Approved By:</span>
-            <span class="meta-value">{approver_name} ({approver_role.title()})</span>
-          </div>
-        </div>
+    body_paragraphs_html = "".join(
+        f'<p style="margin: 0 0 16px 0; color: #1e293b; font-size: 15px; line-height: 1.7; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">'
+        f'{html.escape(p).replace(chr(10), "<br>")}'
+        f'</p>'
+        for p in raw_paragraphs
+    )
 
-        <h3 style="color: #f8fafc; font-size: 16px; margin-bottom: 12px;">Official Bank Resolution Letter:</h3>
-        <div class="resolution-box">{resolution_text}</div>
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{html.escape(subject)}</title>
+</head>
+<body style="margin: 0; padding: 24px 12px; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #0f172a;">
+  <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-top: 5px solid #1e40af; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); overflow: hidden;">
+    
+    <!-- Letterhead Header -->
+    <div style="padding: 28px 32px 20px; border-bottom: 1px solid #f1f5f9;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="vertical-align: top;">
+            <div style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em;">{html.escape(inst_name)}</div>
+            <div style="font-size: 13px; color: #64748b; margin-top: 3px; font-weight: 500;">Consumer Dispute Resolution &amp; Regulatory Compliance Desk</div>
+          </td>
+          <td style="text-align: right; vertical-align: top;">
+            <span style="display: inline-block; background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 10px; border-radius: 9999px;">
+              Formally Resolved
+            </span>
+          </td>
+        </tr>
+      </table>
 
-        <p style="color: #94a3b8; font-size: 14px; line-height: 1.5;">
-          This determination adheres to applicable federal consumer protection laws, including Regulation E (12 CFR Part 1005), Regulation Z (12 CFR Part 1026), and CFPB compliance guidelines.
-        </p>
-
-        <div class="footer">
-          <p>Bank Complaint AI Desk &bull; Consumer Dispute Compliance Department<br>
-          This is an automated notification of formal resolution approval.</p>
-        </div>
+      <!-- Dispute Reference Metadata Ribbon -->
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-top: 18px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <tr>
+            <td style="padding: 3px 0; color: #64748b; width: 35%;">Case Reference ID:</td>
+            <td style="padding: 3px 0; color: #0f172a; font-weight: 700;">#{complaint_id}</td>
+          </tr>
+          <tr>
+            <td style="padding: 3px 0; color: #64748b;">Product / Instrument:</td>
+            <td style="padding: 3px 0; color: #0f172a; font-weight: 600;">{html.escape(prod_name)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 3px 0; color: #64748b;">Dispute Subject:</td>
+            <td style="padding: 3px 0; color: #0f172a;">{html.escape(issue_name)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 3px 0; color: #64748b;">Date of Determination:</td>
+            <td style="padding: 3px 0; color: #0f172a;">{current_date_str}</td>
+          </tr>
+        </table>
       </div>
-    </body>
-    </html>
-    """
+    </div>
 
-    text_content = f"""
-    Official Bank Resolution Notice — Complaint #{complaint_id}
-    
-    Dear Customer,
-    
-    Your dispute (Complaint #{complaint_id}) regarding {product} - {issue} at {company} has been investigated and formally approved by {approver_name} ({approver_role}).
-    
-    OFFICIAL RESOLUTION:
-    --------------------------------------------------
-    {resolution_text}
-    --------------------------------------------------
-    
-    This determination adheres to federal banking compliance standards under Regulation E / Z and CFPB guidelines.
-    
-    Bank Complaint AI Desk - Dispute Compliance Operations
-    """
+    <!-- Letter Body (Unified Narrative) -->
+    <div style="padding: 28px 32px 16px;">
+      {body_paragraphs_html}
+    </div>
+
+    <!-- Compliance Determination & Audit Trail Footer -->
+    <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; font-size: 12px; color: #64748b; line-height: 1.6;">
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+        <tr>
+          <td style="color: #475569; font-weight: 600;">Compliance Approval Record:</td>
+          <td style="text-align: right; color: #0f172a; font-weight: 600;">{html.escape(approver_name)} ({html.escape(approver_role.title())})</td>
+        </tr>
+      </table>
+      <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px;">
+        This dispute determination was conducted in strict adherence with federal consumer financial protection statutes, including <strong>Regulation E (12 CFR Part 1005)</strong>, <strong>Regulation Z (12 CFR Part 1026)</strong>, and CFPB statutory timelines. Please retain Case Reference <strong>#{complaint_id}</strong> for your records.
+      </div>
+    </div>
+
+    <!-- Bottom Email Disclaimer -->
+    <div style="background-color: #0f172a; padding: 16px 32px; text-align: center; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+      Bank Complaint AI Desk &bull; Consumer Dispute Compliance Department<br>
+      Official Electronic Notification &bull; Do not reply directly to this automated dispatch.
+    </div>
+
+  </div>
+</body>
+</html>"""
+
+    # Plain text version for non-HTML email clients
+    text_content = f"""{inst_name.upper()}
+CONSUMER DISPUTE RESOLUTION & COMPLIANCE DESK
+================================================================================
+Case Reference ID: #{complaint_id}
+Product: {prod_name}
+Dispute Subject: {issue_name}
+Date of Determination: {current_date_str}
+Status: Formally Resolved & Approved
+================================================================================
+
+{clean_text}
+
+================================================================================
+COMPLIANCE DETERMINATION & AUDIT RECORD:
+Approved By: {approver_name} ({approver_role.title()})
+Governing Statutes: Regulation E (12 CFR Part 1005) / Regulation Z (12 CFR Part 1026)
+Reference Identifier: #{complaint_id}
+
+This determination adheres to federal banking compliance standards under CFPB rules.
+Please retain Case Reference #{complaint_id} for your records.
+"""
 
     return dispatch_email_transport(
         to_email=consumer_email,
@@ -300,7 +331,6 @@ def send_complaint_approval_email(
         text_content=text_content,
         client_origin=client_origin,
     )
-
 
 
 def send_supervisor_approval_request_email(
