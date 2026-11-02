@@ -104,7 +104,12 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
             theme: "light",
             callback: (token) => {
               setTurnstileToken(token);
-              setError(null);
+              // Only clear if the error was specifically asking to complete verification
+              setError((prev) =>
+                prev && prev.toLowerCase().includes("security verification")
+                  ? null
+                  : prev
+              );
             },
             "expired-callback": () => {
               setTurnstileToken("");
@@ -637,8 +642,45 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
               </div>
             )}
 
-            {success && <div className="auth-message auth-success">{success}</div>}
-            {error && <div className="auth-message auth-error">{error}</div>}
+            {success && (
+              <div className="auth-message auth-success" role="status">
+                <span className="auth-success-icon">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </span>
+                <span className="auth-success-desc">{success}</span>
+              </div>
+            )}
+            {error && (
+              <div className="auth-message auth-error" role="alert" aria-live="assertive">
+                <div className="auth-error-content">
+                  <span className="auth-error-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  </span>
+                  <div className="auth-error-text">
+                    <strong className="auth-error-title">
+                      {error.toLowerCase().includes("password") || error.toLowerCase().includes("email") || error.toLowerCase().includes("credential")
+                        ? "Authentication Failed"
+                        : "Submission Error"}
+                    </strong>
+                    <span className="auth-error-desc">{error}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="auth-error-close"
+                  onClick={() => setError(null)}
+                  title="Dismiss error"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             <button type="submit" className="auth-submit-btn" disabled={loading}>
               {loading ? (
