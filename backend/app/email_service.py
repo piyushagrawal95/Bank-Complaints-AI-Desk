@@ -29,10 +29,11 @@ def dispatch_email_transport(
     if brevo_key:
         try:
             sender_email = (os.getenv("BREVO_SENDER_EMAIL") or settings.brevo_sender_email or "").strip()
+            sender_name = (os.getenv("BREVO_SENDER_NAME") or getattr(settings, "brevo_sender_name", "") or "Piyush Agrawal — Bank Complaint AI Desk").strip()
             if not sender_email:
                 raise ValueError("BREVO_SENDER_EMAIL is not configured in .env")
             payload = json.dumps({
-                "sender": {"name": "Bank Complaint AI Desk", "email": sender_email},
+                "sender": {"name": sender_name, "email": sender_email},
                 "to": [{"email": to_email}],
                 "subject": subject,
                 "htmlContent": html_content,
