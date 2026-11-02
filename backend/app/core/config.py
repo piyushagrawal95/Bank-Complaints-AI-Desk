@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     # Alternative Email Providers
     brevo_api_key: str = os.getenv("BREVO_API_KEY", "")
     brevo_sender_email: str = os.getenv("BREVO_SENDER_EMAIL", "")
-    brevo_sender_name: str = os.getenv("BREVO_SENDER_NAME", "Piyush Agrawal — Bank Complaint AI Desk")
+    brevo_sender_name: str = os.getenv("BREVO_SENDER_NAME", "Bank Complaint AI Desk")
     resend_api_key: str = os.getenv("RESEND_API_KEY", "")
     resend_from: str = os.getenv("RESEND_FROM", "")
     maileroo_api_key: str = os.getenv("MAILEROO_API_KEY", "")
