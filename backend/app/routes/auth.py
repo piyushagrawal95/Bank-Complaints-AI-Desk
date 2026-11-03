@@ -11,7 +11,7 @@ from email.mime.text import MIMEText
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 import json
 import urllib.request
 import urllib.error
@@ -170,7 +170,21 @@ def signup(body: SignupIn, request: Request):
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
     if row is None:
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
+        # Account exists. If it was never verified (and not deactivated by an admin), let the latest
+        # signer take over the account and send a fresh confirmation link. Verified/deactivated -> 409.
+        try:
+            with pool.connection() as conn:
+                row = conn.execute(
+                    "UPDATE users SET password_hash = %s, full_name = COALESCE(%s, full_name) "
+                    "WHERE email = %s AND email_verified = false AND is_active = false "
+                    "RETURNING id, email, full_name, role, is_active, supervisor_id",
+                    [hash_password(body.password), body.full_name, email],
+                ).fetchone()
+        except Exception:
+            logger.exception("Database error during signup (re-register)")
+            raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
+        if row is None:
+            raise HTTPException(status_code=409, detail="An account with this email already exists")
 
     client_origin = settings.get_safe_frontend_origin(request, prefer_public=True)
 
@@ -206,9 +220,23 @@ def verify_email(body:VerifyEmailIn):
 
     try:
         with pool.connection() as conn:
-            res=conn.execute("Update users set is_active=true where email=%s returning id,email,is_active",[email]).fetchone()
+            res = conn.execute(
+                "UPDATE users SET is_active = true, email_verified = true "
+                "WHERE email = %s AND email_verified = false RETURNING id, email, is_active",
+                [email],
+            ).fetchone()
             if not res:
-                raise HTTPException(status_code=404,detail="User account not found")
+                existing = conn.execute(
+                    "SELECT is_active FROM users WHERE email = %s", [email]
+                ).fetchone()
+                if not existing:
+                    raise HTTPException(status_code=404, detail="User account not found")
+                if existing["is_active"]:
+                    return {"message": "Email already verified. Please sign in."}
+                raise HTTPException(
+                    status_code=403,
+                    detail="This account has been deactivated by an Administrator. Please contact support.",
+                )
 
     except HTTPException:
         raise 
@@ -238,7 +266,7 @@ def login(body: LoginIn, request: Request):
     try:
         with pool.connection() as conn:
             user = conn.execute(
-                "SELECT id, email, full_name, role, is_active, password_hash, token_version "
+                "SELECT id, email, full_name, role, is_active, email_verified, password_hash, token_version "
                 "FROM users WHERE email = %s",
                 [email],
             ).fetchone()
@@ -261,9 +289,14 @@ def login(body: LoginIn, request: Request):
             pass
 
     if not user["is_active"]:
+        if not user.get("email_verified"):
+            raise HTTPException(
+                status_code=403,
+                detail="Please verify your email address before logging in. Check your inbox for the confirmation link."
+            )
         raise HTTPException(
             status_code=403,
-            detail="Please verify your email address before logging in. Check your inbox for the confirmation link."
+            detail="Your account has been deactivated by an Administrator. Please contact support."
         )
 
     try:
@@ -340,8 +373,8 @@ def login_with_google(body: GoogleLoginIn):
                 # New Google users are created strictly with standard 'agent' role
                 user = conn.execute(
                     """
-                    INSERT INTO users (email, password_hash, full_name, role, is_active)
-                    VALUES (%s, 'oauth_google', %s, 'agent', true)
+                    INSERT INTO users (email, password_hash, full_name, role, is_active, email_verified)
+                    VALUES (%s, 'oauth_google', %s, 'agent', true, true)
                     ON CONFLICT (email) DO NOTHING
                     RETURNING id, email, full_name, role, is_active
                     """,
@@ -446,7 +479,7 @@ def send_password_reset_email(to_email: str, raw_token: str, client_origin: str 
 
 @router.post("/forgot-password")
 @limiter.limit("5/minute")
-def forgot_password(body: ForgotPasswordIn, request: Request):
+def forgot_password(body: ForgotPasswordIn, request: Request, background_tasks: BackgroundTasks):
     """Generates a secure password reset token with 15 minutes validity."""
     email = body.email.lower()
     try:
@@ -470,8 +503,8 @@ def forgot_password(body: ForgotPasswordIn, request: Request):
 
     client_origin = settings.get_safe_frontend_origin(request, prefer_public=True)
 
-    # Dispatch email
-    sent = send_password_reset_email(email, raw_token, client_origin=client_origin)
+    # Dispatch email in background so the response is instant for every email (registered or not)
+    background_tasks.add_task(send_password_reset_email, email, raw_token, client_origin=client_origin)
     logger.info(f"Password reset token issued for {email}")
     return {
         "message": "If this email is registered, a password reset link has been issued.",
@@ -786,7 +819,10 @@ To review and approve or reject this request, please log in below:
 {portal_url}
 ================================================================================
 """
-        dispatch_email_transport(super_admin, subject, html_content, plain_content, client_origin=client_origin)
+        if super_admin:
+            dispatch_email_transport(super_admin, subject, html_content, plain_content, client_origin=client_origin)
+        else:
+            logger.warning("SUPER_ADMIN_EMAIL is not set; role upgrade notification email skipped")
     except Exception as email_err:
         logger.exception(f"Could not dispatch email notification for role upgrade: {email_err}")
 
@@ -977,9 +1013,9 @@ def reject_role_upgrade(request_id: int, admin=Depends(require_role("admin"))):
                     <div style="background: #1e3a8a; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
                         <h2 style="color: #ffffff; margin: 0; font-size: 20px;">Bank Complaint AI Desk</h2>
                     </div>
-                    <h3 style="color: #0f172a; margin-top: 0;">Hello {user_name},</h3>
+                    <h3 style="color: #0f172a; margin-top: 0;">Hello {html.escape(user_name)},</h3>
                     <p style="color: #334155; font-size: 15px; line-height: 1.5;">
-                        Your request to be promoted to <strong>{to_role.upper()}</strong> was reviewed and has not been approved at this time.
+                        Your request to be promoted to <strong>{html.escape(to_role.upper())}</strong> was reviewed and has not been approved at this time.
                     </p>
                     <p style="color: #475569; font-size: 14px;">
                         Your account continues with its current permissions. If you have questions regarding this decision, please consult your desk administrator.

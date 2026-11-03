@@ -1069,3 +1069,107 @@ def dispatch_response(complaint_id: int, user=Depends(require_role("supervisor",
     except Exception:
         logger.exception("Database error while dispatching response")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
+
+
+# ---------------------------------------------------------------------------
+# Resend resolution emails (use when the first dispatch failed, e.g. mail outage)
+# PASTE THIS AT THE VERY END OF backend/app/routes/complaints.py
+# ---------------------------------------------------------------------------
+def _queue_resolution_email(background_tasks: BackgroundTasks, complaint_id: int, consumer_email: str,
+                            row: dict, client_origin: str | None):
+    background_tasks.add_task(
+        dispatch_approval_email_task,
+        complaint_id=complaint_id,
+        consumer_email=consumer_email,
+        product=row.get("product") or "Banking Service",
+        issue=row.get("issue") or "Customer Dispute",
+        company=row.get("company") or "Financial Institution",
+        approver_name=row.get("approved_by_name") or "Compliance Desk",
+        approver_role=row.get("approved_by_role") or "supervisor",
+        resolution_text=row["response_text"],
+        client_origin=client_origin,
+    )
+
+
+@router.post("/resend-failed-emails")
+def resend_failed_emails(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    limit: int = Query(50, ge=1, le=200),
+    admin=Depends(require_role("admin")),
+):
+    """Admin: re-queue resolution emails for every approved complaint whose email previously FAILED."""
+    try:
+        with pool.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT c.complaint_id, c.product, c.issue, c.company, c.consumer_email,
+                       r.response_text, r.approved_by_name, r.approved_by_role
+                FROM complaints c
+                JOIN complaint_responses r ON r.complaint_id = c.complaint_id
+                WHERE r.status IN ('approved', 'dispatched')
+                  AND r.email_dispatch_status = 'failed'
+                  AND COALESCE(TRIM(c.consumer_email), '') <> ''
+                ORDER BY r.approved_at ASC NULLS LAST
+                LIMIT %s
+                """,
+                [limit],
+            ).fetchall()
+    except Exception:
+        logger.exception("Database error while listing failed emails")
+        raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
+
+    client_origin = settings.get_safe_frontend_origin(request, prefer_public=True)
+    for r in rows:
+        _queue_resolution_email(background_tasks, r["complaint_id"], r["consumer_email"].strip().lower(), r, client_origin)
+
+    return {
+        "queued": len(rows),
+        "complaint_ids": [r["complaint_id"] for r in rows],
+        "message": f"Queued {len(rows)} resolution email(s) for resending. Check logs and email_dispatch_status.",
+    }
+
+
+@router.post("/{complaint_id}/resend-email")
+def resend_resolution_email(
+    complaint_id: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    force: bool = False,
+    user=Depends(require_role("supervisor", "admin")),
+):
+    """Supervisor/Admin: resend the approved resolution letter to the consumer."""
+    is_admin = user.get("role") == "admin" or (user.get("email") or "").lower() == (settings.super_admin_email or "").strip().lower()
+    try:
+        with pool.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT c.product, c.issue, c.company, c.consumer_email,
+                       r.response_text, r.status, r.approved_by_name, r.approved_by_role,
+                       r.assigned_to_id, r.email_dispatch_status
+                FROM complaints c
+                JOIN complaint_responses r ON r.complaint_id = c.complaint_id
+                WHERE c.complaint_id = %s
+                """,
+                [complaint_id],
+            ).fetchone()
+    except Exception:
+        logger.exception("Database error while preparing email resend")
+        raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
+
+    if not row:
+        raise HTTPException(status_code=404, detail="No approved response found for this complaint.")
+    if row["status"] not in ("approved", "dispatched"):
+        raise HTTPException(status_code=400, detail=f"Cannot resend: response status is '{row['status']}'. It must be approved first.")
+    if not is_admin and row.get("assigned_to_id") and row["assigned_to_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied: This complaint is assigned to another supervisor.")
+
+    consumer_email = (row.get("consumer_email") or "").strip().lower()
+    if not consumer_email:
+        raise HTTPException(status_code=400, detail="No consumer email on this complaint. Add one first.")
+    if row.get("email_dispatch_status") == "sent" and not force:
+        raise HTTPException(status_code=400, detail="Email was already sent successfully. Use force=true to send it again.")
+
+    client_origin = settings.get_safe_frontend_origin(request, prefer_public=True)
+    _queue_resolution_email(background_tasks, complaint_id, consumer_email, row, client_origin)
+    return {"success": True, "message": f"Resolution email for complaint #{complaint_id} queued for {consumer_email}."}
