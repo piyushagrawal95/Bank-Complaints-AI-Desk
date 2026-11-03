@@ -431,14 +431,15 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
                 ) : similarCases.length > 0 ? (
                   <div className="similar-grid">
                     {similarCases.map((c) => {
-                      const matchPct = Math.round((c.similarity || 0.75) * 100);
-                      const isHighMatch = matchPct >= 80;
+                      const hasScore = c.similarity !== null && c.similarity !== undefined;
+                      const matchPct = hasScore ? Math.round(c.similarity * 100) : null;
+                      const isHighMatch = hasScore && matchPct >= 80;
                       return (
                         <div key={c.complaint_id} className="similar-card">
                           <div className="similar-card-top">
                             <span className="similar-case-id">Case #{c.complaint_id}</span>
                             <span className={`similar-match-pill ${isHighMatch ? "high-match" : "mid-match"}`}>
-                              {matchPct}% Match
+                              {hasScore ? `${matchPct}% Match` : "Same product / issue"}
                             </span>
                           </div>
 

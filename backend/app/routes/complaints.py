@@ -663,7 +663,7 @@ def similar_complaints(complaint_id: int, top_k: int = Query(3, ge=1, le=10)):
             else:
                 sql = """
                     SELECT complaint_id, date_received, product, issue, company,
-                           company_response_to_consumer, narrative, 0.75 as similarity
+                           company_response_to_consumer, narrative, NULL::numeric AS similarity
                     FROM complaints
                     WHERE complaint_id != %s AND (product = %s OR issue = %s)
                     ORDER BY date_received DESC
