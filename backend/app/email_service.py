@@ -321,7 +321,10 @@ def send_supervisor_approval_request_email(
     safe_product = html.escape(product or 'Service')
     safe_issue = html.escape(issue or 'Customer Dispute')
     safe_draft = html.escape(response_draft[:800])
-    portal_link = (settings.frontend_origin or "https://bank-complaints-ai-desk.vercel.app").rstrip('/')
+    base_portal = (client_origin or settings.get_safe_frontend_origin(prefer_public=True)).rstrip('/')
+    if "localhost" in base_portal or "127.0.0.1" in base_portal:
+        base_portal = "https://bank-complaints-ai-desk.vercel.app"
+    portal_link = f"{base_portal}/?view=approvals&login=true" 
 
     html_content = f"""
     <!DOCTYPE html>
@@ -405,7 +408,8 @@ def send_supervisor_approval_request_email(
     {response_draft[:600]}...
     --------------------------------------------------
     
-    Please sign into the Bank Complaint AI Desk to review and formally approve this case.
+    Please sign into the Bank Complaint AI Desk to review and formally approve this case:
+    {portal_link}
     
     Bank Complaint AI Desk - Regulatory Compliance Operations
     """
@@ -431,6 +435,11 @@ def send_agent_rejection_notification_email(
 ) -> bool:
     """Dispatches a notification email to an agent when a supervisor requests changes / rejects a draft."""
     subject = f"Revisions Required: Complaint #{complaint_id} ({company})"
+
+    base_portal = (client_origin or settings.get_safe_frontend_origin(prefer_public=True)).rstrip('/')
+    if "localhost" in base_portal or "127.0.0.1" in base_portal:
+        base_portal = "https://bank-complaints-ai-desk.vercel.app"
+    portal_link = f"{base_portal}/?view=complaints&complaint_id={complaint_id}&login=true"
 
     html_content = f"""
     <!DOCTYPE html>
@@ -458,6 +467,12 @@ def send_agent_rejection_notification_email(
 
         <p style="font-size: 14px; color: #475569;">Please log into the Bank Complaint AI Desk, update your draft according to the feedback above, and re-submit it for approval.</p>
 
+        <div style="text-align: center; margin: 26px 0 20px;">
+          <a href="{portal_link}" style="display: inline-block; background-color: #ea580c; color: #ffffff; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);">
+            👉 Review Feedback &amp; Update Complaint #{complaint_id}
+          </a>
+        </div>
+
         <div class="footer">
           <p>Bank Complaint AI Desk &bull; Regulatory Compliance Operations</p>
         </div>
@@ -478,7 +493,8 @@ def send_agent_rejection_notification_email(
     {reason}
     --------------------------------------------------
     
-    Please sign into the Bank Complaint AI Desk, edit your response, and re-submit for approval.
+    Please sign into the Bank Complaint AI Desk, edit your response, and re-submit for approval:
+    {portal_link}
     
     Bank Complaint AI Desk - Regulatory Compliance Operations
     """

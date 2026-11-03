@@ -648,8 +648,20 @@ function App() {
       setAuthModal("reset");
     }
     const verifyTok = params.get("verify_email");
-    if (verifyTok) {
+    if (verifyTok || params.get("login") === "true" || params.get("auth") === "login") {
       setAuthModal("login");
+    }
+    const requestedView = params.get("view");
+    if (requestedView) {
+      setView(requestedView);
+    }
+    const complaintIdParam = params.get("complaint_id");
+    if (complaintIdParam) {
+      const parsedId = parseInt(complaintIdParam, 10);
+      if (!isNaN(parsedId)) {
+        setDirectSelectedId(parsedId);
+        setView("complaints");
+      }
     }
   }, []);
 
@@ -753,6 +765,19 @@ function App() {
                 onLoggedIn={(newUser) => {
                   setUser(newUser);
                   setAuthModal(null);
+                  const params = new URLSearchParams(window.location.search);
+                  const reqView = params.get("view");
+                  if (reqView) {
+                    setView(reqView);
+                  }
+                  const cid = params.get("complaint_id");
+                  if (cid) {
+                    const parsed = parseInt(cid, 10);
+                    if (!isNaN(parsed)) {
+                      setDirectSelectedId(parsed);
+                      setView("complaints");
+                    }
+                  }
                 }}
                 initialMode={authModal}
                 onClose={() => setAuthModal(null)}

@@ -16,7 +16,7 @@ for env_path in [
 
 class Settings(BaseSettings):
     app_name: str = os.getenv("APP_NAME", "Bank Complaint AI Desk")
-    frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "https://bank-complaints-ai-desk.vercel.app")
     cors_origins: str = os.getenv("CORS_ORIGINS", "")
     database_url: str = os.getenv("DATABASE_URL", "")
     llm_provider: str = os.getenv("LLM_PROVIDER", "groq")
@@ -72,13 +72,23 @@ class Settings(BaseSettings):
         ])
         return list(dict.fromkeys(raw_list))
 
-    def get_safe_frontend_origin(self, request=None) -> str:
-        """Returns a verified, whitelisted frontend origin. Never trusts arbitrary Origin/Host headers."""
+    def get_safe_frontend_origin(self, request=None, prefer_public: bool = False) -> str:
+        """Returns a verified, whitelisted frontend origin. Never trusts arbitrary Origin/Host headers.
+        If prefer_public is True (e.g. for outgoing emails), converts localhost origins to the
+        public production domain so links can be clicked from external email clients and mobile devices.
+        """
+        public_url = "https://bank-complaints-ai-desk.vercel.app"
         if request:
             req_origin = (request.headers.get("origin") or "").strip().rstrip("/")
             if req_origin in self.allowed_origins:
+                if prefer_public and ("localhost" in req_origin or "127.0.0.1" in req_origin):
+                    return public_url
                 return req_origin
-        return (self.frontend_origin or "https://bank-complaints-ai-desk.vercel.app").rstrip("/")
+
+        cand = (self.frontend_origin or public_url).rstrip("/")
+        if prefer_public and ("localhost" in cand or "127.0.0.1" in cand):
+            return public_url
+        return cand
 
     model_config = SettingsConfigDict(extra="ignore")
 

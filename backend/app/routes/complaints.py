@@ -817,7 +817,7 @@ def request_approval(
         raise HTTPException(status_code=503, detail="Database error submitting response for approval.")
 
     # Dispatch email notifications in background task without blocking the response
-    client_origin = settings.get_safe_frontend_origin(request)
+    client_origin = settings.get_safe_frontend_origin(request, prefer_public=True)
     for sup in supervisors_to_notify:
         background_tasks.add_task(
             send_supervisor_approval_request_email,
@@ -911,7 +911,7 @@ def reject_response(
             company=complaint.get("company") if complaint else "Bank",
             supervisor_name=user_name,
             reason=body.reason,
-            client_origin=request.headers.get("origin"),
+            client_origin=settings.get_safe_frontend_origin(request, prefer_public=True),
         )
 
     return {
@@ -1006,7 +1006,7 @@ def approve_response(
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
     # Schedule background dispatch of resolution email so supervisor response is instant (<100ms)
-    client_origin = settings.get_safe_frontend_origin(request)
+    client_origin = settings.get_safe_frontend_origin(request, prefer_public=True)
     if target_email:
         background_tasks.add_task(
             dispatch_approval_email_task,

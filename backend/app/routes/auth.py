@@ -171,7 +171,7 @@ def signup(body: SignupIn, request: Request):
     if row is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
-    client_origin = settings.get_safe_frontend_origin(request)
+    client_origin = settings.get_safe_frontend_origin(request, prefer_public=True)
 
     email_sent = False
     try:
@@ -518,7 +518,9 @@ def send_confirmation_email(to_email: str, full_name: str | None = None, client_
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
-    base_origin = (client_origin or settings.frontend_origin).rstrip("/")
+    base_origin = (client_origin or settings.get_safe_frontend_origin(prefer_public=True)).rstrip("/")
+    if "localhost" in base_origin or "127.0.0.1" in base_origin:
+        base_origin = "https://bank-complaints-ai-desk.vercel.app"
     confirm_link = f"{base_origin}/?verify_email={verify_token}"
 
     name_display = html.escape(full_name) if full_name else "Bank Associate"
@@ -548,7 +550,9 @@ def send_confirmation_email(to_email: str, full_name: str | None = None, client_
 
 def send_password_reset_email(to_email: str, raw_token: str, client_origin: str | None = None) -> bool:
     """Sends a professional password reset email with a 15-minute secure link."""
-    base_origin = (client_origin or settings.frontend_origin).rstrip("/")
+    base_origin = (client_origin or settings.get_safe_frontend_origin(prefer_public=True)).rstrip("/")
+    if "localhost" in base_origin or "127.0.0.1" in base_origin:
+        base_origin = "https://bank-complaints-ai-desk.vercel.app"
     reset_link = f"{base_origin}/?reset_token={raw_token}"
 
     subject = "Reset Your Password - Bank Complaint AI Desk"
@@ -597,7 +601,7 @@ def forgot_password(body: ForgotPasswordIn, request: Request):
         logger.exception("Error creating reset token")
         raise HTTPException(status_code=503, detail="Database is unavailable. Please try again.")
 
-    client_origin = settings.get_safe_frontend_origin(request)
+    client_origin = settings.get_safe_frontend_origin(request, prefer_public=True)
 
     # Dispatch email
     sent = send_password_reset_email(email, raw_token, client_origin=client_origin)
@@ -814,8 +818,10 @@ def request_role_upgrade(request: Request, body: RoleUpgradeRequestIn, user=Depe
         super_admin = (settings.super_admin_email or "").strip().lower()
         subject = f"Action Required: Role Upgrade Request from {user_name} ({target_role.upper()})"
         
-        client_origin = settings.get_safe_frontend_origin(request)
-        portal_url = client_origin
+        client_origin = settings.get_safe_frontend_origin(request, prefer_public=True)
+        if "localhost" in client_origin or "127.0.0.1" in client_origin:
+            client_origin = "https://bank-complaints-ai-desk.vercel.app"
+        portal_url = f"{client_origin}/?view=users&login=true" 
 
         html_content = f"""<!DOCTYPE html>
 <html>
@@ -1012,7 +1018,10 @@ def approve_role_upgrade(request: Request, request_id: int, admin=Depends(requir
                 user_name = user_info.get("full_name") or target_email.split("@")[0]
                 admin_name = admin.get("full_name") or admin.get("email", "Admin")
                 subject = f"Role Upgrade Approved: Welcome to {new_role.upper()}"
-                portal_url = settings.get_safe_frontend_origin(request)
+                portal_base = settings.get_safe_frontend_origin(request, prefer_public=True)
+                if "localhost" in portal_base or "127.0.0.1" in portal_base:
+                    portal_base = "https://bank-complaints-ai-desk.vercel.app"
+                portal_url = f"{portal_base}/?login=true" 
                 html_content = f"""
                 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
                     <div style="background: #1e3a8a; padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
