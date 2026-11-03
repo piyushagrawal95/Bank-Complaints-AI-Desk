@@ -69,12 +69,6 @@ export default function LandingPage({ onOpenAuth }) {
             >
               Get Started →
             </button>
-            <button
-              className="hero-btn-secondary"
-              onClick={() => onOpenAuth("signup")}
-            >
-              Create Account
-            </button>
           </div>
         </div>
       </section>
@@ -162,14 +156,7 @@ export default function LandingPage({ onOpenAuth }) {
               </p>
             </div>
           </div>
-          <div className="footer-right">
-            <button className="footer-btn" onClick={() => onOpenAuth("login")}>
-              Agent Login
-            </button>
-            <button className="footer-btn" onClick={() => onOpenAuth("signup")}>
-              Register
-            </button>
-          </div>
+
         </div>
         <div className="footer-bottom">
           <span>&copy; {new Date().getFullYear()} Bank Complaint AI Desk. All rights reserved.</span>
