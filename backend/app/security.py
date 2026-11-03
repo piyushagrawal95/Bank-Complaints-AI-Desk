@@ -48,11 +48,11 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
-def create_access_token(user_id: int, role: str) -> str:
+def create_access_token(user_id: int, role: str, token_version: int = 1) -> str:
     if not settings.jwt_secret:
         raise RuntimeError("JWT_SECRET is not set in backend/.env")
     expires = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_minutes)
-    payload = {"sub": str(user_id), "role": role, "exp": expires}
+    payload = {"sub": str(user_id), "role": role, "tv": token_version, "exp": expires}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -182,7 +182,7 @@ def verify_turnstile_token(token: str | None, client_ip: str | None = None) -> t
             err_codes = res_data.get("error-codes", [])
             return False, f"Cloudflare verification failed: {', '.join(err_codes) or 'Invalid token'}"
     except Exception as e:
-        return False, f"Cloudflare verification connection error: {str(e)}"
+        return False, "Security verification service temporarily unavailable. Please try again."
 
 
 def verify_security_challenge(
@@ -191,13 +191,17 @@ def verify_security_challenge(
     captcha_answer: str | None = None,
     client_ip: str | None = None,
 ) -> tuple[bool, str]:
-    """Unified security verification supporting Cloudflare Turnstile with Math CAPTCHA fallback."""
-    # 1. Check Cloudflare Turnstile if token provided
-    if turnstile_token and turnstile_token.strip():
-        return verify_turnstile_token(turnstile_token, client_ip)
+    """Strict security verification requiring Cloudflare Turnstile token.
+    Math CAPTCHA fallback has been removed to prevent automated bot scripting and token replay.
+    """
+    is_test_env = (os.getenv("TESTING") == "1" or getattr(settings, "environment", "") == "test")
+    if is_test_env:
+        if (turnstile_token and turnstile_token.strip() in ("TEST_CAPTCHA_BYPASS", "test_turnstile_mock_success")) or (captcha_token == "TEST_CAPTCHA_BYPASS"):
+            return True, ""
 
-    # 2. Check Math CAPTCHA if provided
-    if captcha_token and captcha_answer:
-        return verify_captcha_challenge(captcha_token, captcha_answer)
-
-    return False, "Security verification (Cloudflare Turnstile or CAPTCHA) is required."
+    token = (turnstile_token or "").strip()
+    if not token and (captcha_token or captcha_answer):
+        return False, "Bot protection requires Cloudflare Turnstile verification. Math CAPTCHA is no longer supported."
+    if not token:
+        return False, "Security verification (Cloudflare Turnstile) is required."
+    return verify_turnstile_token(token, client_ip)

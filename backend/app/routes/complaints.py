@@ -94,11 +94,17 @@ def list_complaints(
         conditions.append("date_received <= %s")
         params.append(date_to)
     if q:
-        clean_q=q.strip().lstrip("#")
-        conditions.append(
-            "(CAST(complaint_id AS TEXT) ILIKE %s OR issue ILIKE %s OR sub_issue ILIKE %s OR company ILIKE %s OR consumer_email ILIKE %s)"
-        )
-        params.extend([f"%{clean_q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"])
+        clean_q = q.strip().lstrip("#")
+        if clean_q.isdigit():
+            conditions.append(
+                "(complaint_id = %s OR issue ILIKE %s OR sub_issue ILIKE %s OR company ILIKE %s OR consumer_email ILIKE %s)"
+            )
+            params.extend([int(clean_q), f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"])
+        else:
+            conditions.append(
+                "(issue ILIKE %s OR sub_issue ILIKE %s OR company ILIKE %s OR consumer_email ILIKE %s)"
+            )
+            params.extend([f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"])
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     offset = (page - 1) * page_size
@@ -172,7 +178,7 @@ async def extract_complaint_file(file: UploadFile = File(...)):
         raise
     except Exception as exc:
         logger.exception("Error extracting complaint document")
-        raise HTTPException(status_code=500, detail=f"Failed to process file: {str(exc)}")
+        raise HTTPException(status_code=500, detail="Failed to process file. The document format may be corrupted or unsupported.")
 
 
 @router.post("/create")
@@ -259,7 +265,7 @@ def list_pending_approvals(user=Depends(require_role("supervisor", "admin"))):
     user_role = user.get("role", "agent")
     user_id = user.get("id")
     user_email = (user.get("email") or "").lower()
-    super_admin_email = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+    super_admin_email = (settings.super_admin_email or "").strip().lower()
     is_admin = user_role == "admin" or user_email == super_admin_email
 
     if is_admin:
@@ -304,7 +310,7 @@ def list_pending_approvals(user=Depends(require_role("supervisor", "admin"))):
         return {"count": len(rows), "items": rows}
     except Exception as exc:
         logger.exception("Error fetching pending approvals")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch pending approvals: {str(exc)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve pending approvals.")
 
 
 @router.get("/{complaint_id}")
@@ -520,14 +526,32 @@ def batch_create_complaints(
         }
     except Exception as exc:
         logger.exception("Error in batch complaint creation")
-        raise HTTPException(status_code=500, detail=f"Failed to batch create complaints: {str(exc)}")
+        raise HTTPException(status_code=500, detail="Failed to batch create complaints. Please verify data format.")
 
 
 @router.put("/{complaint_id}/email")
 def update_complaint_email(complaint_id: int, body: UpdateEmailIn, user=Depends(get_current_user)):
-    """Updates or adds the consumer email address for an existing complaint."""
+    """Updates or adds the consumer email address for an existing complaint.
+    Restricted to Supervisors, Admins, or the assigned complaint owner/creator.
+    """
+    user_role = user.get("role", "agent")
+    user_id = user.get("id")
+    is_privileged = user_role in ("supervisor", "admin")
+
     try:
         with pool.connection() as conn:
+            # If standard agent, verify they are the assigned owner of this complaint draft
+            if not is_privileged:
+                resp_owner = conn.execute(
+                    "SELECT requested_by_id FROM complaint_responses WHERE complaint_id = %s",
+                    [complaint_id]
+                ).fetchone()
+                if not resp_owner or resp_owner.get("requested_by_id") != user_id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Access denied: Only supervisors, administrators, or the assigned complaint owner can update consumer contact email.",
+                    )
+
             # Prevent altering email on already dispatched complaints
             resp = conn.execute("SELECT status FROM complaint_responses WHERE complaint_id = %s", [complaint_id]).fetchone()
             if resp and resp.get("status") == "dispatched":
@@ -822,7 +846,7 @@ def reject_response(
     """Supervisor/Admin action: Rejects resolution draft with feedback notes sent back to agent."""
     user_role = user.get("role", "agent")
     user_email = (user.get("email") or "").lower()
-    super_admin_email = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+    super_admin_email = (settings.super_admin_email or "").strip().lower()
     is_admin = user_role == "admin" or user_email == super_admin_email
     if not (is_admin or user_role == "supervisor"):
         raise HTTPException(status_code=403, detail="Access denied: Only supervisors or admins can reject draft responses.")
@@ -908,7 +932,7 @@ def approve_response(
     """Supervisor/Admin action: Approves resolution response and asynchronously dispatches email to consumer."""
     user_role = user.get("role", "agent")
     user_email = (user.get("email") or "").lower()
-    super_admin_email = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+    super_admin_email = (settings.super_admin_email or "").strip().lower()
     is_admin = user_role == "admin" or user_email == super_admin_email
     if not (is_admin or user_role == "supervisor"):
         raise HTTPException(

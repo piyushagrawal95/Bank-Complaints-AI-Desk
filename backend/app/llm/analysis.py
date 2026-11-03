@@ -94,16 +94,17 @@ def analyze_metadata(product, sub_product, issue, sub_issue) -> dict:
 
 
 def clean_human_letter(text: str) -> str:
-    """Strip robotic markdown asterisks, emojis, or artificial legal headers so it looks 100% human-written."""
+    """Normalize and format the LLM drafted response letter for supervisory review.
+    Removes conversational preambles and normalizes line breaks while preserving valid letter layout.
+    """
     if not text:
         return ""
-    # Remove certified mail lines and formal receipt notices
-    text = re.sub(r"(?i)^.*(certified mail|return receipt requested|formal legal notice).*$\n?", "", text, flags=re.MULTILINE)
-    # Remove asterisks used for bold (**text**) or bullets (* item)
-    text = text.replace("**", "").replace("*", "")
-    # Remove markdown header hashes (# or ##)
-    text = re.sub(r"^#{1,6}\s*", "", text, flags=re.MULTILINE)
-    # Remove unicode emojis
+    # Strip common LLM conversational preambles (e.g. "Certainly! Here is...", "Here is a draft:")
+    text = re.sub(r"(?i)^(certainly|here is (a |the )?(draft|response|letter)|sure, here).*?:\s*\n+", "", text.strip())
+    # Strip markdown code fencing if the LLM enclosed the letter in ```
+    text = re.sub(r"^```(?:markdown|text)?\s*\n?", "", text)
+    text = re.sub(r"\n?```\s*$", "", text)
+    # Remove informal unicode emojis
     text = re.sub(r"[\U00010000-\U0010ffff]", "", text)
     # Normalize multiple blank lines
     text = re.sub(r"\n{3,}", "\n\n", text).strip()

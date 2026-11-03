@@ -40,8 +40,9 @@ for fname in sorted(all_sql_files.keys()):
     sql_files_to_run.append(all_sql_files[fname])
 
 with psycopg.connect(url) as conn:
-    # Ensure pgvector extension is available
+    # Ensure pgvector and pg_trgm extensions are available
     conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
     
     for f in sql_files_to_run:
         print(f"Applying schema: {f.name}")

@@ -43,7 +43,7 @@ REGULATIONS = [
 ]
 
 # -------------------------------------------------------------
-# PERCENTAGE-BASED DYNAMIC CHUNKING PARAMETERS (Sir's Formula)
+# PERCENTAGE-BASED DYNAMIC CHUNKING PARAMETERS
 # -------------------------------------------------------------
 CHUNK_PCT = 0.20       # 20% of text as base target chunk size
 OVERLAP_PCT = 0.15     # 15% of chunk size as dynamic overlap
@@ -68,7 +68,7 @@ def percent_dynamic_chunk(text: str, chunk_pct: float = CHUNK_PCT, overlap_pct: 
     if text_len < 100:
         return [text] if text_len >= 50 else []
 
-    # 1. Calculate 4% target size with bounds
+    # 1. Calculate target size with bounds
     raw_size = int(text_len * chunk_pct)
     chunk_size = max(MIN_CHUNK_CHARS, min(raw_size, MAX_CHUNK_CHARS))
 
@@ -131,7 +131,7 @@ def extract_chunks(pdf_path: Path, reg_name: str, part_num: str):
 
         cleaned_page = clean_text(raw_text)
 
-        # Apply 4% Chunking with 15% Dynamic Overlap
+        # Apply dynamic chunking with overlap
         page_chunks = percent_dynamic_chunk(cleaned_page, CHUNK_PCT, OVERLAP_PCT)
         for chunk_str in page_chunks:
             chunks.append({

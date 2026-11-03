@@ -65,6 +65,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("csv_path", nargs="?", default="data/complaints/complaints-2026-10-14_02_31.csv")
     parser.add_argument("--chunksize", type=int, default=5000)
+    parser.add_argument("--use-copy", action="store_true", help="Use PostgreSQL COPY streaming for maximum ingestion throughput on fresh databases")
     args = parser.parse_args()
 
     load_dotenv("backend/.env")
@@ -84,8 +85,16 @@ def main():
             try:
                 rows, skipped, reasons = clean(chunk)
                 with conn.cursor() as cur:
-                    cur.executemany(INSERT_SQL, rows)
-                    inserted = cur.rowcount
+                    if args.use_copy:
+                        # High-throughput COPY streaming for bulk datasets (millions of rows)
+                        with cur.copy(f"COPY complaints ({', '.join(DB_COLUMNS)}) FROM STDIN") as copy:
+                            for row in rows:
+                                copy.write_row(row)
+                        inserted = len(rows)
+                    else:
+                        # Conflict-safe upsert for incremental updates
+                        cur.executemany(INSERT_SQL, rows)
+                        inserted = cur.rowcount
                 conn.commit()
             except Exception as exc:
                 conn.rollback()

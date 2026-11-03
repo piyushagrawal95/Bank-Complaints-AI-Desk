@@ -68,7 +68,7 @@ def test_captcha_challenge_and_verification(client):
     assert r_missing.status_code == 400
     assert "Security verification" in r_missing.json()["detail"]
 
-    # 3. Reject invalid captcha answer
+    # 3. Reject math captcha fallback (enforces Cloudflare Turnstile)
     r_invalid = client.post("/auth/login", json={
         "email": "nobody@bank.com",
         "password": "Password123@",
@@ -76,7 +76,7 @@ def test_captcha_challenge_and_verification(client):
         "captcha_answer": "wrong_ans_999",
     })
     assert r_invalid.status_code == 400
-    assert "Incorrect CAPTCHA answer" in r_invalid.json()["detail"]
+    assert "Cloudflare Turnstile" in r_invalid.json()["detail"] or "no longer supported" in r_invalid.json()["detail"]
 
     # 4. Turnstile token verification
     r_turnstile = client.post("/auth/login", json={
@@ -111,7 +111,7 @@ def test_google_login_invalid(client):
 
 def test_google_login_mock_token(client):
     from unittest.mock import patch
-    with patch("google.oauth2.id_token.verify_oauth2_token", return_value={"email": "test_google_runner@bank.com", "name": "Test Google Runner"}):
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value={"email": "test_google_runner@bank.com", "name": "Test Google Runner", "email_verified": True}):
         res = client.post("/auth/google", json={"credential": "mock_valid_google_token"})
         assert res.status_code == 200
         data = res.json()

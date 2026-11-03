@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     access_token_minutes: int = int(os.getenv("ACCESS_TOKEN_MINUTES", "60"))
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
-    super_admin_email: str = os.getenv("SUPER_ADMIN_EMAIL", "piyushagrawal300504@gmail.com")
+    super_admin_email: str = os.getenv("SUPER_ADMIN_EMAIL", "")
+    regulation_similarity_threshold: float = float(os.getenv("REGULATION_SIMILARITY_THRESHOLD", "0.40"))
 
     # Email & SMTP Configurations
     smtp_host: str = os.getenv("SMTP_HOST", "smtp.gmail.com")

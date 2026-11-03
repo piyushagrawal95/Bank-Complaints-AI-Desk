@@ -20,6 +20,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 import re
 
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.db import pool
 from app.deps import get_current_user, require_role
 from app.security import (
@@ -118,6 +119,7 @@ def get_captcha():
 
 
 @router.post("/signup", status_code=201)
+@limiter.limit("10/minute")
 def signup(body: SignupIn, request: Request):
     # Verify Security (Cloudflare Turnstile with CAPTCHA fallback)
     client_ip = request.client.host if request.client else None
@@ -215,6 +217,7 @@ def verify_email(body:VerifyEmailIn):
     return {"message": "Email successfully verified! Your account is now active. Please sign in."}
 
 @router.post("/login")
+@limiter.limit("10/minute")
 def login(body: LoginIn, request: Request):
     # Verify Security (Cloudflare Turnstile with CAPTCHA fallback)
     client_ip = request.client.host if request.client else None
@@ -234,7 +237,7 @@ def login(body: LoginIn, request: Request):
     try:
         with pool.connection() as conn:
             user = conn.execute(
-                "SELECT id, email, full_name, role, is_active, password_hash "
+                "SELECT id, email, full_name, role, is_active, password_hash, token_version "
                 "FROM users WHERE email = %s",
                 [email],
             ).fetchone()
@@ -246,8 +249,8 @@ def login(body: LoginIn, request: Request):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
     # Enforce permanent super admin rights
-    super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
-    if email == super_admin or email == "piyushagrawal300504@gmail.com":
+    super_admin = (settings.super_admin_email or "").strip().lower()
+    if super_admin and email == super_admin:
         user["role"] = "admin"
         user["is_active"] = True
         try:
@@ -263,7 +266,7 @@ def login(body: LoginIn, request: Request):
         )
 
     try:
-        token = create_access_token(user["id"], user["role"])
+        token = create_access_token(user["id"], user["role"], user.get("token_version", 1) or 1)
     except RuntimeError:
         logger.exception("Could not create token")
         raise HTTPException(status_code=500, detail="Login is not configured on the server")
@@ -309,13 +312,19 @@ def login_with_google(body: GoogleLoginIn):
             detail="Google authentication failed: Token missing email identity claim.",
         )
 
+    if not idinfo.get("email_verified"):
+        raise HTTPException(
+            status_code=400,
+            detail="Google login rejected: Email address is not verified with Google.",
+        )
+
     email = idinfo["email"].lower().strip()
     full_name = idinfo.get("name") or idinfo.get("given_name") or email.split("@")[0]
 
     try:
         with pool.connection() as conn:
             user = conn.execute(
-                "SELECT id, email, full_name, role, is_active FROM users WHERE email = %s",
+                "SELECT id, email, full_name, role, is_active, token_version FROM users WHERE email = %s",
                 [email],
             ).fetchone()
 
@@ -344,7 +353,7 @@ def login_with_google(body: GoogleLoginIn):
 
     # Create bank system access token
     try:
-        token = create_access_token(user["id"], user["role"])
+        token = create_access_token(user["id"], user["role"], user.get("token_version", 1) or 1)
     except RuntimeError:
         logger.exception("Could not create token")
         raise HTTPException(status_code=500, detail="Login is not configured on the server")
@@ -565,6 +574,7 @@ def send_password_reset_email(to_email: str, raw_token: str, client_origin: str 
     return dispatch_email_transport(to_email, subject, html_content, reset_plain, client_origin=client_origin)
 
 @router.post("/forgot-password")
+@limiter.limit("5/minute")
 def forgot_password(body: ForgotPasswordIn, request: Request):
     """Generates a secure password reset token with 15 minutes validity."""
     email = body.email.lower()
@@ -618,7 +628,7 @@ def reset_password(body: ResetPasswordIn):
                 raise HTTPException(status_code=400, detail="Reset token is invalid or has expired")
 
             conn.execute(
-                "UPDATE users SET password_hash = %s WHERE email = %s",
+                "UPDATE users SET password_hash = %s, token_version = COALESCE(token_version, 1) + 1 WHERE email = %s",
                 [hash_password(body.new_password), token_record["email"]],
             )
             conn.execute(
@@ -647,9 +657,9 @@ def list_users(admin=Depends(require_role("admin"))):
                 ORDER BY u.id
                 """
             ).fetchall()
-            super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+            super_admin = (settings.super_admin_email or "").strip().lower()
             for r in rows:
-                if r["email"].lower() == super_admin or r["email"].lower() == "piyushagrawal300504@gmail.com":
+                if super_admin and r["email"].lower() == super_admin:
                     r["role"] = "admin"
                     r["is_active"] = True
             return rows
@@ -737,9 +747,9 @@ def update_user_role(body: RoleUpdateIn, admin=Depends(require_role("admin"))):
                 raise HTTPException(status_code=404, detail="User not found")
 
             # Permanent Root Super Admin Protection: Cannot be demoted or changed by anyone
-            super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+            super_admin = (settings.super_admin_email or "").strip().lower()
             target_email = target["email"].lower()
-            if target_email == super_admin or target_email == "piyushagrawal300504@gmail.com":
+            if super_admin and target_email == super_admin:
                 raise HTTPException(
                     status_code=403,
                     detail=f"The root Super Admin ({target['email']}) is permanent and cannot be modified or demoted by any user."
@@ -801,7 +811,7 @@ def request_role_upgrade(request: Request, body: RoleUpgradeRequestIn, user=Depe
     try:
         user_name = user.get("full_name") or user.get("email")
         user_email = user.get("email") or ""
-        super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
+        super_admin = (settings.super_admin_email or "").strip().lower()
         subject = f"Action Required: Role Upgrade Request from {user_name} ({target_role.upper()})"
         
         client_origin = settings.get_safe_frontend_origin(request)

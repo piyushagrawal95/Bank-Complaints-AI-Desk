@@ -27,23 +27,38 @@ def get_current_user(creds: HTTPAuthorizationCredentials | None = Depends(bearer
     try:
         with pool.connection() as conn:
             user = conn.execute(
-                "SELECT id, email, full_name, role, is_active FROM users WHERE id = %s",
+                "SELECT id, email, full_name, role, is_active, token_version FROM users WHERE id = %s",
                 [user_id],
             ).fetchone()
     except Exception:
-        logger.exception("Database error while reading the current user")
-        raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
+        # Fallback if token_version column is not yet migrated in old schema
+        try:
+            with pool.connection() as conn:
+                user = conn.execute(
+                    "SELECT id, email, full_name, role, is_active FROM users WHERE id = %s",
+                    [user_id],
+                ).fetchone()
+        except Exception:
+            logger.exception("Database error while reading the current user")
+            raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
     if user is None:
         raise HTTPException(status_code=401, detail="Account not found")
 
-    # Enforce permanent super admin rights from environment config or permanent fallback
-    super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
-    if user["email"].lower() == super_admin or user["email"].lower() == "piyushagrawal300504@gmail.com":
+    # Invalidate token if token_version does not match (e.g. password was reset)
+    token_tv = payload.get("tv")
+    db_tv = user.get("token_version")
+    if token_tv is not None and db_tv is not None and token_tv != db_tv:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+
+    # Enforce permanent super admin rights strictly from environment config
+    super_admin = (settings.super_admin_email or "").strip().lower()
+    if super_admin and user["email"].lower() == super_admin:
+        needs_db_fix = (user.get("role") != "admin" or not user.get("is_active"))
         user["role"] = "admin"
         user["is_active"] = True
         # If DB row is not synced as admin/active, auto-heal DB row in background
-        if user.get("role") != "admin" or not user.get("is_active"):
+        if needs_db_fix:
             try:
                 with pool.connection() as fix_conn:
                     fix_conn.execute(

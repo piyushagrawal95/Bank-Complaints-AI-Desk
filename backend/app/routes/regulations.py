@@ -23,27 +23,37 @@ class AskRuleIn(BaseModel):
 
 @router.post("/ask")
 def ask_regulation_rule(body: AskRuleIn):
-    """Answers a banking rule question using RAG (pgvector similarity + LLM grounded response)."""
+    """Answers a banking rule question using Hybrid RAG (pgvector similarity + keyword/section matching + similarity threshold)."""
+    import re
     question = body.question.strip()
 
     try:
         query_vector = embed_query(question)
-    except Exception as exc:
+    except Exception:
         logger.exception("Failed to generate query embedding")
         raise HTTPException(status_code=500, detail="Failed to process question vector.")
 
+    # Extract potential regulation section numbers (e.g. '1005.11', '§ 1005.6', '1026.13')
+    section_matches = re.findall(r"(?:§\s*)?(\d{4}\.\d+|[A-Z])", question)
+    section_kw = f"%{section_matches[0]}%" if section_matches else "%__none__%"
+
+    # Hybrid ranking: vector similarity + lexical boost for exact CFR section matches
     search_sql = """
         SELECT regulation_name, section, page_number, chunk_text,
-               ROUND((1 - (embedding <=> %s::vector))::numeric, 4) AS similarity
+               ROUND((1 - (embedding <=> %s::vector))::numeric, 4) AS similarity,
+               CASE WHEN section ILIKE %s OR chunk_text ILIKE %s THEN 0.20 ELSE 0.0 END AS boost
         FROM regulation_chunks
-        ORDER BY embedding <=> %s::vector
+        ORDER BY ((1 - (embedding <=> %s::vector)) + (CASE WHEN section ILIKE %s OR chunk_text ILIKE %s THEN 0.20 ELSE 0.0 END)) DESC
         LIMIT %s;
     """
     vector_str = f"[{','.join(str(v) for v in query_vector)}]"
 
     try:
         with pool.connection() as conn:
-            chunks = conn.execute(search_sql, [vector_str, vector_str, body.top_k]).fetchall()
+            chunks = conn.execute(
+                search_sql,
+                [vector_str, section_kw, section_kw, vector_str, section_kw, section_kw, body.top_k]
+            ).fetchall()
     except Exception:
         logger.exception("Database error retrieving regulation chunks")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
@@ -53,6 +63,20 @@ def ask_regulation_rule(body: AskRuleIn):
             "question": question,
             "answer": "No regulation documents are currently indexed in the system.",
             "citations": [],
+            "model": settings.llm_model,
+        }
+
+    # Strict similarity threshold check to prevent hallucinations when question is out-of-domain
+    max_sim = max((float(c["similarity"]) for c in chunks), default=0.0)
+    has_exact_match = any(float(c.get("boost", 0)) > 0 for c in chunks)
+    min_threshold = settings.regulation_similarity_threshold
+
+    if max_sim < min_threshold and not has_exact_match:
+        return {
+            "question": question,
+            "answer": "I could not find sufficiently relevant provisions in the indexed federal banking regulations (Regulation E, Z, V, F) to answer this specific query. Please consult official regulatory publications or compliance counsel.",
+            "citations": [],
+            "model": settings.llm_model,
         }
 
     context_blocks = []
@@ -80,8 +104,9 @@ def ask_regulation_rule(body: AskRuleIn):
 
     try:
         answer = chat(messages, temperature=0.1, max_tokens=750)
-    except LLMError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+    except LLMError:
+        logger.exception("LLM error during regulation ask")
+        raise HTTPException(status_code=503, detail="AI compliance service is temporarily unavailable. Please try again.")
 
     return {
         "question": question,

@@ -5,7 +5,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.db import pool
 from app.routes import ai, auth, complaints, regulations, trends
 
@@ -22,6 +26,8 @@ app = FastAPI(
     description="AI-powered Complaint Intelligence & Regulatory Compliance System for Banks",
     lifespan=lifespan,
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure strict CORS origins - wildcard regex removed to prevent cross-origin credentials exploit
 app.add_middleware(
