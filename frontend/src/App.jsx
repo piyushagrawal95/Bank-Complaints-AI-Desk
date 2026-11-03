@@ -825,9 +825,6 @@ function App() {
                   <div className="dropdown-user-info">
                     <span className="dropdown-name">{user.full_name || "Bank Officer"}</span>
                     <span className="dropdown-email">{user.email}</span>
-                    <span className="dropdown-session-badge">
-                      <span className="active-dot"></span> Active Session
-                    </span>
                   </div>
                 </div>
 
@@ -1004,12 +1001,7 @@ function App() {
                   </span>
                 </span>
               </div>
-              <div className="profile-row">
-                <span className="profile-lbl">Account Status:</span>
-                <span className="profile-val" style={{ color: "#16a34a" }}>
-                  ● Active & Verified
-                </span>
-              </div>
+
             </div>
 
             {/* Role Elevation Section (For Non-Admins) */}
