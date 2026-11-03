@@ -6,6 +6,7 @@ import os
 import re
 import smtplib
 import ssl
+import urllib.error
 import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -16,6 +17,32 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _post_json(url: str, payload: dict, headers: dict, provider: str, timeout: int = 10) -> bool:
+    """POST JSON to an HTTPS email API. Logs the provider's real error body on failure."""
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "User-Agent": "BankComplaintAIDesk/1.0", **headers},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if 200 <= resp.status < 300:
+                return True
+            logger.warning(f"{provider} returned unexpected HTTP {resp.status}")
+    except urllib.error.HTTPError as exc:
+        # The body tells you WHY (unverified sender, invalid key, recipient not allowed, ...)
+        body = ""
+        try:
+            body = exc.read().decode("utf-8", "replace")[:500]
+        except Exception:
+            pass
+        logger.warning(f"{provider} HTTP {exc.code}: {body}")
+    except Exception as exc:
+        logger.warning(f"{provider} request failed: {exc!r}")
+    return False
+
+
 def dispatch_email_transport(
     to_email: str,
     subject: str,
@@ -23,134 +50,31 @@ def dispatch_email_transport(
     text_content: str,
     client_origin: str | None = None,
 ) -> bool:
-    """Dispatches email using Google Gmail SMTP (Primary), with HTTPS fallbacks (Resend, Maileroo, Brevo)."""
-    # 1. Primary: Direct Google Gmail SMTP (High Deliverability, Official Google DKIM/SPF)
-    smtp_user = (os.getenv("SMTP_USER") or settings.smtp_user or "").strip()
-    smtp_password = (os.getenv("SMTP_PASSWORD") or settings.smtp_password or "").strip()
-    smtp_host = (os.getenv("SMTP_HOST") or settings.smtp_host or "smtp.gmail.com").strip()
-    smtp_port = int(os.getenv("SMTP_PORT") or settings.smtp_port or 587)
-    smtp_from = (os.getenv("SMTP_FROM") or settings.smtp_from or smtp_user).strip()
-
-    if smtp_user and smtp_password:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
-        msg["To"] = to_email
-        msg["Date"] = formatdate(localtime=True)
-        msg["Message-ID"] = make_msgid(domain=smtp_from.split("@")[-1])
-        msg.attach(MIMEText(text_content, "plain"))
-        msg.attach(MIMEText(html_content, "html"))
-
-        try:
-            if smtp_port == 465:
-                ctx = ssl.create_default_context()
-                with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx, timeout=12) as srv:
-                    srv.login(smtp_user, smtp_password)
-                    srv.send_message(msg)
-            else:
-                with smtplib.SMTP(smtp_host, smtp_port, timeout=12) as srv:
-                    srv.ehlo()
-                    ctx = ssl.create_default_context()
-                    srv.starttls(context=ctx)
-                    srv.ehlo()
-                    srv.login(smtp_user, smtp_password)
-                    srv.send_message(msg)
-            logger.info(f"Email successfully dispatched via Gmail SMTP to {to_email}")
-            return True
-        except Exception as exc:
-            logger.warning(f"Gmail SMTP dispatch failed for {to_email}: {exc}. Trying fallback...")
-
-    # 2. Resend API (HTTPS Port 443 Fallback)
-    resend_key = (os.getenv("RESEND_API_KEY") or settings.resend_api_key or "").strip()
-    if resend_key:
-        try:
-            from_addr = (os.getenv("RESEND_FROM") or settings.resend_from or "Bank Complaint Desk <onboarding@resend.dev>").strip()
-            payload = json.dumps({
-                "from": from_addr,
-                "to": [to_email],
-                "subject": subject,
-                "html": html_content,
-                "text": text_content,
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                "https://api.resend.com/emails",
-                data=payload,
-                headers={
-                    "Authorization": f"Bearer {resend_key}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                if resp.status in (200, 201, 202):
-                    logger.info(f"Email dispatched via Resend HTTPS API to {to_email}")
-                    return True
-        except Exception as exc:
-            logger.warning(f"Resend HTTPS dispatch failed: {exc}")
-
-    # 3. Maileroo API (HTTPS Port 443 Fallback)
+    """Sends mail via Maileroo HTTPS API only. Logs the provider's real error on failure."""
     maileroo_key = (os.getenv("MAILEROO_API_KEY") or settings.maileroo_api_key or "").strip()
-    if maileroo_key:
-        try:
-            sender_email = (os.getenv("MAILEROO_FROM") or settings.maileroo_from or smtp_from or "").strip()
-            if sender_email:
-                payload = json.dumps({
-                    "from": {"address": sender_email, "display_name": "Bank Complaint AI Desk"},
-                    "to": [{"address": to_email, "display_name": "Bank User"}],
-                    "subject": subject,
-                    "html": html_content,
-                    "plain": text_content,
-                }).encode("utf-8")
-                req = urllib.request.Request(
-                    "https://smtp.maileroo.com/api/v2/emails",
-                    data=payload,
-                    headers={
-                        "Authorization": f"Bearer {maileroo_key}",
-                        "X-API-Key": maileroo_key,
-                        "Content-Type": "application/json",
-                        "User-Agent": "BankComplaintAIDesk/1.0",
-                    },
-                    method="POST",
-                )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    if resp.status in (200, 201, 202):
-                        logger.info(f"Email dispatched via Maileroo HTTPS API to {to_email}")
-                        return True
-        except Exception as exc:
-            logger.warning(f"Maileroo HTTPS dispatch failed: {exc}")
+    maileroo_from = (os.getenv("MAILEROO_FROM") or settings.maileroo_from or "").strip()
 
-    logger.warning(f"All email dispatch transports failed for {to_email}")
-    return False
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"Bank Complaint AI Desk <{smtp_from}>"
-    msg["To"] = to_email
-    msg["Date"] = formatdate(localtime=True)
-    msg["Message-ID"] = make_msgid(domain=smtp_from.split("@")[-1])
-    msg.attach(MIMEText(text_content, "plain"))
-    msg.attach(MIMEText(html_content, "html"))
-
-    try:
-        if smtp_port == 465:
-            ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx, timeout=15) as srv:
-                srv.login(smtp_user, smtp_password)
-                srv.send_message(msg)
-        else:
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as srv:
-                srv.ehlo()
-                ctx = ssl.create_default_context()
-                srv.starttls(context=ctx)
-                srv.ehlo()
-                srv.login(smtp_user, smtp_password)
-                srv.send_message(msg)
-        logger.info(f"Email successfully dispatched via SMTP to {to_email}")
-        return True
-    except Exception as exc:
-        logger.warning(f"SMTP dispatch failed: {exc}")
+    if not maileroo_key or not maileroo_from:
+        logger.error("Maileroo not configured: set MAILEROO_API_KEY and MAILEROO_FROM")
         return False
+
+    ok = _post_json(
+        "https://smtp.maileroo.com/api/v2/emails",
+        {
+            "from": {"address": maileroo_from, "display_name": "Bank Complaint AI Desk"},
+            "to": [{"address": to_email, "display_name": "Bank User"}],
+            "subject": subject,
+            "html": html_content,
+            "plain": text_content,
+        },
+        {"Authorization": f"Bearer {maileroo_key}", "X-API-Key": maileroo_key},
+        "Maileroo",
+    )
+    if ok:
+        logger.info(f"Email dispatched via Maileroo to {to_email}")
+    else:
+        logger.error(f"Maileroo failed for {to_email}")
+    return ok
 
 
 def send_complaint_approval_email(
