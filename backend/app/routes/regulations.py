@@ -1,4 +1,5 @@
 import logging
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -23,8 +24,7 @@ class AskRuleIn(BaseModel):
 
 @router.post("/ask")
 def ask_regulation_rule(body: AskRuleIn):
-    """Answers a banking rule question using Hybrid RAG (pgvector similarity + keyword/section matching + similarity threshold)."""
-    import re
+    """Answers a banking rule question using HNSW pgvector similarity + grounded LLM synthesis."""
     question = body.question.strip()
 
     try:
@@ -33,27 +33,43 @@ def ask_regulation_rule(body: AskRuleIn):
         logger.exception("Failed to generate query embedding")
         raise HTTPException(status_code=500, detail="Failed to process question vector.")
 
-    # Extract potential regulation section numbers (e.g. '1005.11', '§ 1005.6', '1026.13')
-    section_matches = re.findall(r"(?:§\s*)?(\d{4}\.\d+|[A-Z])", question)
-    section_kw = f"%{section_matches[0]}%" if section_matches else "%__none__%"
+    vector_str = f"[{','.join(str(v) for v in query_vector)}]"
+    chunks = []
 
-    # Hybrid ranking: vector similarity + lexical boost for exact CFR section matches
+    # If user explicitly references a specific CFR section (e.g. '1005.11', '1026.13', '1022.43', '1006.6')
+    section_match = re.search(r"\b(1005\.\d+|1026\.\d+|1022\.\d+|1006\.\d+)\b", question)
+
     search_sql = """
         SELECT regulation_name, section, page_number, chunk_text,
-               ROUND((1 - (embedding <=> %s::vector))::numeric, 4) AS similarity,
-               CASE WHEN section ILIKE %s OR chunk_text ILIKE %s THEN 0.20 ELSE 0.0 END AS boost
+               ROUND((1 - (embedding <=> %s::vector))::numeric, 4) AS similarity
         FROM regulation_chunks
-        ORDER BY ((1 - (embedding <=> %s::vector)) + (CASE WHEN section ILIKE %s OR chunk_text ILIKE %s THEN 0.20 ELSE 0.0 END)) DESC
+        ORDER BY embedding <=> %s::vector
         LIMIT %s;
     """
-    vector_str = f"[{','.join(str(v) for v in query_vector)}]"
 
     try:
         with pool.connection() as conn:
-            chunks = conn.execute(
-                search_sql,
-                [vector_str, section_kw, section_kw, vector_str, section_kw, section_kw, body.top_k]
-            ).fetchall()
+            # 1. If explicit section is requested, search within that section first
+            if section_match:
+                sec_code = section_match.group(1)
+                sec_sql = """
+                    SELECT regulation_name, section, page_number, chunk_text,
+                           ROUND((1 - (embedding <=> %s::vector))::numeric, 4) AS similarity
+                    FROM regulation_chunks
+                    WHERE section ILIKE %s
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s;
+                """
+                exact_chunks = conn.execute(
+                    sec_sql,
+                    [vector_str, f"%{sec_code}%", vector_str, body.top_k]
+                ).fetchall()
+                if exact_chunks:
+                    chunks = exact_chunks
+
+            # 2. Native HNSW cosine distance vector retrieval (O(log N) speed and optimal accuracy)
+            if not chunks:
+                chunks = conn.execute(search_sql, [vector_str, vector_str, body.top_k]).fetchall()
     except Exception:
         logger.exception("Database error retrieving regulation chunks")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
@@ -66,12 +82,11 @@ def ask_regulation_rule(body: AskRuleIn):
             "model": settings.llm_model,
         }
 
-    # Strict similarity threshold check to prevent hallucinations when question is out-of-domain
+    # Similarity threshold: reject completely out-of-domain noise
     max_sim = max((float(c["similarity"]) for c in chunks), default=0.0)
-    has_exact_match = any(float(c.get("boost", 0)) > 0 for c in chunks)
-    min_threshold = settings.regulation_similarity_threshold
+    min_threshold = 0.35
 
-    if max_sim < min_threshold and not has_exact_match:
+    if max_sim < min_threshold and not section_match:
         return {
             "question": question,
             "answer": "I could not find sufficiently relevant provisions in the indexed federal banking regulations (Regulation E, Z, V, F) to answer this specific query. Please consult official regulatory publications or compliance counsel.",
@@ -113,5 +128,4 @@ def ask_regulation_rule(body: AskRuleIn):
         "answer": answer,
         "citations": citations,
         "model": settings.llm_model,
-        "provider": settings.llm_provider,
     }
