@@ -610,7 +610,7 @@ function App() {
         window.location.href = res.url;
       }
     } catch (err) {
-      alert(err.message || "Failed to start Stripe checkout.");
+      alert(err.message || "Failed to start payment checkout.");
     } finally {
       setBillingLoading(false);
     }
@@ -1200,16 +1200,16 @@ function App() {
               {billingLoading ? (
                 <>
                   <span className="inline-spinner" style={{ borderTopColor: "#fff" }}></span>
-                  Connecting to Stripe Checkout...
+                  Connecting to Payment Gateway...
                 </>
               ) : (
                 <>
-                  <IconShield size={18} /> Proceed to Secure Stripe Checkout →
+                  <IconShield size={18} /> Proceed to Payment →
                 </>
               )}
             </button>
             <div className="upgrade-footer-note">
-              🔒 Encrypted 256-bit Stripe Checkout. Instant activation upon completion.
+              🔒 256-bit Encrypted Payment Gateway. Instant plan activation upon completion.
             </div>
           </div>
         </div>
@@ -1286,7 +1286,7 @@ function App() {
                     onClick={handleManageSubscription}
                     disabled={billingLoading}
                   >
-                    {billingLoading ? "Opening..." : "Manage Billing & Invoices (Stripe Portal) ↗"}
+                    {billingLoading ? "Opening..." : "Manage Subscription & Billing Portal ↗"}
                   </button>
                 ) : (
                   <button

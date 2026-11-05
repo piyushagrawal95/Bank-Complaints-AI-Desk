@@ -16,3 +16,10 @@ ON regulation_chunks USING hnsw (embedding vector_cosine_ops);
 
 CREATE INDEX IF NOT EXISTS idx_reg_chunks_name 
 ON regulation_chunks (regulation_name);
+-- Track daily questions limit for Ask the Rules (max 5 per day)
+CREATE TABLE IF NOT EXISTS user_ask_rules_usage (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    usage_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    query_count INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, usage_date)
+);

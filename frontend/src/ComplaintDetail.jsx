@@ -49,7 +49,8 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated, onOpenUpgra
   const [copied, setCopied] = useState(false);
 
   const isAgent = (currentUser?.role || "agent") === "agent";
-  const isPro = currentUser?.role === "admin" || currentUser?.plan === "pro";
+  const isSuperAdmin = (currentUser?.email || "").toLowerCase().trim() === "piyushagrawal300504@gmail.com";
+  const isPro = isSuperAdmin || currentUser?.plan === "pro";
 
   useEffect(() => {
     let cancelled = false;
@@ -360,14 +361,25 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated, onOpenUpgra
                 <div className="section-head-row">
                   <h3>AI Categorization & Summary</h3>
                   {analysis && (
-                    <button
-                      className="refresh-ai-btn"
-                      disabled={analyzing}
-                      onClick={() => runAnalysis(true)}
-                      title="Re-run AI analysis with fresh insights"
-                    >
-                      {analyzing ? "Re-analyzing..." : "↻ Refresh AI"}
-                    </button>
+                    isPro ? (
+                      <button
+                        className="refresh-ai-btn"
+                        disabled={analyzing}
+                        onClick={() => runAnalysis(true)}
+                        title="Re-run AI analysis with fresh insights"
+                      >
+                        {analyzing ? "Re-analyzing..." : "↻ Refresh AI"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="refresh-ai-btn"
+                        onClick={onOpenUpgradeModal}
+                        title="Pro Feature: Upgrade to refresh AI insights"
+                      >
+                        🔒 Refresh AI (Pro)
+                      </button>
+                    )
                   )}
                 </div>
 
@@ -525,8 +537,13 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated, onOpenUpgra
                       {drafting ? "Drafting with AI..." : replyDraft ? "Regenerate Draft" : "Draft Reply with AI"}
                     </button>
                   ) : (
-                    <button type="button" className="draft-ai-btn" onClick={onOpenUpgradeModal} title="Pro Feature">
-                      🔒 Draft with AI (Pro)
+                    <button
+                      type="button"
+                      className="draft-ai-btn"
+                      onClick={onOpenUpgradeModal}
+                      title="Pro Feature: Upgrade to auto-draft resolution letters"
+                    >
+                      🔒 {replyDraft ? "Regenerate Draft (Pro)" : "Draft Reply with AI (Pro)"}
                     </button>
                   )}
                 </div>

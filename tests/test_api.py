@@ -398,14 +398,35 @@ def test_pro_gating_enforcement(client):
     assert r_draft.status_code == 402
     assert "Pro Plan subscription" in r_draft.json()["detail"]
 
-    # 2. Ask Regulations should be rejected with 402 Payment Required
+    # 2. Ask Regulations daily quota: free tier can check /regulations/usage
+    r_usage = client.get(
+        "/regulations/usage",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r_usage.status_code == 200
+    assert r_usage.json()["is_pro"] is False
+    assert r_usage.json()["limit"] == 5
+
+    # Simulate user having reached the 5-question limit for today
+    with pool.connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO user_ask_rules_usage (user_id, usage_date, query_count)
+            VALUES (%s, CURRENT_DATE, 5)
+            ON CONFLICT (user_id, usage_date)
+            DO UPDATE SET query_count = 5
+            """,
+            [user["id"]],
+        )
+
+    # 6th question should be rejected with 429 Too Many Requests (daily limit reached)
     r_ask = client.post(
         "/regulations/ask",
         headers={"Authorization": f"Bearer {token}"},
         json={"question": "What is the timeline for error resolution?"},
     )
-    assert r_ask.status_code == 402
-    assert "Pro Plan subscription" in r_ask.json()["detail"]
+    assert r_ask.status_code == 429
+    assert "Daily question limit reached" in r_ask.json()["detail"]
 
     # 3. AI Analysis should be rejected with 402 Payment Required
     r_analysis = client.post(

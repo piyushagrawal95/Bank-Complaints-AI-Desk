@@ -98,12 +98,12 @@ def require_role(*roles: str):
         return user
     return checker
 def require_pro(user=Depends(get_current_user)):
-    """Enforce Pro subscription plan or Admin role for premium AI capabilities."""
+    """Enforce active Pro subscription plan (Super Admin has root owner access)."""
     super_admin = (settings.super_admin_email or "").strip().lower()
-    is_admin = user.get("role") == "admin" or (super_admin and user["email"].lower() == super_admin)
+    is_super = bool(super_admin and user["email"].lower() == super_admin)
     is_pro = user.get("plan") == "pro"
 
-    if is_admin or is_pro:
+    if is_super or is_pro:
         return user
 
     raise HTTPException(

@@ -254,6 +254,7 @@ export const dispatchComplaintResponse = (id) =>
 // RAG Regulations & Trends
 export const askRule = (question) =>
   request("/regulations/ask", { method: "POST", body: { question } });
+export const getRegulationsUsage = () => request("/regulations/usage");
 
 export const getSpikes = (params) => request("/trends/spikes", { params });
 

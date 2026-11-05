@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.db import pool
-from app.deps import get_current_user, require_pro
+from app.deps import get_current_user
 from app.llm.client import LLMError, chat
 from app.llm.embedding import embed_query
 from app.llm.prompts import (
@@ -14,7 +14,7 @@ from app.llm.prompts import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/regulations", tags=["regulations"], dependencies=[Depends(require_pro)])
+router = APIRouter(prefix="/regulations", tags=["regulations"], dependencies=[Depends(get_current_user)])
 
 
 class AskRuleIn(BaseModel):
@@ -22,9 +22,72 @@ class AskRuleIn(BaseModel):
     top_k: int = Field(default=4, ge=1, le=10)
 
 
+@router.get("/usage")
+def get_regulations_usage(user=Depends(get_current_user)):
+    """Returns today's question usage and remaining quota for Ask the Rules."""
+    super_admin = (settings.super_admin_email or "").strip().lower()
+    is_super = bool(super_admin and user["email"].lower() == super_admin)
+    is_pro = is_super or (user.get("plan") == "pro")
+
+    if is_pro:
+        return {
+            "is_pro": True,
+            "limit": None,
+            "used": None,
+            "remaining": None,
+        }
+
+    try:
+        with pool.connection() as conn:
+            row = conn.execute(
+                "SELECT query_count FROM user_ask_rules_usage WHERE user_id = %s AND usage_date = CURRENT_DATE",
+                [user["id"]],
+            ).fetchone()
+            used = int(row["query_count"]) if row else 0
+            return {
+                "is_pro": False,
+                "limit": 5,
+                "used": used,
+                "remaining": max(0, 5 - used),
+            }
+    except Exception:
+        logger.exception("Failed to query user_ask_rules_usage")
+        return {
+            "is_pro": False,
+            "limit": 5,
+            "used": 0,
+            "remaining": 5,
+        }
+
+
 @router.post("/ask")
-def ask_regulation_rule(body: AskRuleIn):
-    """Answers a banking rule question using HNSW pgvector similarity + grounded LLM synthesis."""
+def ask_regulation_rule(body: AskRuleIn, user=Depends(get_current_user)):
+    """Answers a banking rule question using HNSW pgvector similarity + grounded LLM synthesis.
+    Free tier accounts are limited to 5 questions per day; Pro tier has unlimited access.
+    """
+    super_admin = (settings.super_admin_email or "").strip().lower()
+    is_super = bool(super_admin and user["email"].lower() == super_admin)
+    is_pro = is_super or (user.get("plan") == "pro")
+
+    current_count = 0
+    if not is_pro:
+        try:
+            with pool.connection() as conn:
+                row = conn.execute(
+                    "SELECT query_count FROM user_ask_rules_usage WHERE user_id = %s AND usage_date = CURRENT_DATE",
+                    [user["id"]],
+                ).fetchone()
+                current_count = int(row["query_count"]) if row else 0
+        except Exception:
+            logger.exception("Failed to query user_ask_rules_usage")
+            current_count = 0
+
+        if current_count >= 5:
+            raise HTTPException(
+                status_code=429,
+                detail="Daily question limit reached: Free tier accounts can ask up to 5 questions per day in Ask the Rules. Upgrade to Pro for unlimited questions.",
+            )
+
     question = body.question.strip()
 
     try:
@@ -74,12 +137,36 @@ def ask_regulation_rule(body: AskRuleIn):
         logger.exception("Database error retrieving regulation chunks")
         raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
 
+    new_count = current_count + 1
+    if not is_pro:
+        try:
+            with pool.connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO user_ask_rules_usage (user_id, usage_date, query_count)
+                    VALUES (%s, CURRENT_DATE, 1)
+                    ON CONFLICT (user_id, usage_date)
+                    DO UPDATE SET query_count = user_ask_rules_usage.query_count + 1;
+                    """,
+                    [user["id"]],
+                )
+        except Exception:
+            logger.exception("Failed to update user_ask_rules_usage")
+
+    usage_payload = {
+        "is_pro": is_pro,
+        "limit": None if is_pro else 5,
+        "used": None if is_pro else new_count,
+        "remaining": None if is_pro else max(0, 5 - new_count),
+    }
+
     if not chunks:
         return {
             "question": question,
             "answer": "No regulation documents are currently indexed in the system.",
             "citations": [],
             "model": settings.llm_model,
+            "usage": usage_payload,
         }
 
     # Similarity threshold: reject completely out-of-domain noise
@@ -92,6 +179,7 @@ def ask_regulation_rule(body: AskRuleIn):
             "answer": "I could not find sufficiently relevant provisions in the indexed federal banking regulations (Regulation E, Z, V, F) to answer this specific query. Please consult official regulatory publications or compliance counsel.",
             "citations": [],
             "model": settings.llm_model,
+            "usage": usage_payload,
         }
 
     context_blocks = []
@@ -128,4 +216,5 @@ def ask_regulation_rule(body: AskRuleIn):
         "answer": answer,
         "citations": citations,
         "model": settings.llm_model,
+        "usage": usage_payload,
     }

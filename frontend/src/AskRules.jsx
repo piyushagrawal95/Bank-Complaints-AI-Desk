@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { askRule } from "./api";
-import { IconCheck, IconCopy, IconRules } from "./Icons";
+import { askRule, getRegulationsUsage } from "./api";
+import { IconAlert, IconCheck, IconCopy, IconRules, IconSparkles } from "./Icons";
 import "./AskRules.css";
 
 const QUICK_QUESTIONS = [
@@ -153,7 +153,9 @@ function detectRegulations(text, citations = []) {
 }
 
 function AskRules({ currentUser, onOpenUpgradeModal }) {
-  const isPro = currentUser?.role === "admin" || currentUser?.plan === "pro";
+  const isSuperAdmin = (currentUser?.email || "").toLowerCase().trim() === "piyushagrawal300504@gmail.com";
+  const isPro = isSuperAdmin || currentUser?.plan === "pro";
+
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -161,6 +163,21 @@ function AskRules({ currentUser, onOpenUpgradeModal }) {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [showCitations, setShowCitations] = useState(false);
+  const [usage, setUsage] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getRegulationsUsage()
+      .then((data) => {
+        if (!cancelled && data) {
+          setUsage(data);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let interval = null;
@@ -175,13 +192,17 @@ function AskRules({ currentUser, onOpenUpgradeModal }) {
     };
   }, [loading]);
 
+  const isLimitReached = !isPro && usage && usage.remaining === 0;
+
   async function handleAsk(qToAsk) {
     const q = qToAsk || question;
     if (!q.trim()) return;
-    if (!isPro) {
+
+    if (isLimitReached) {
       if (onOpenUpgradeModal) onOpenUpgradeModal();
       return;
     }
+
     setLoading(true);
     setError(null);
     setResult(null);
@@ -191,7 +212,14 @@ function AskRules({ currentUser, onOpenUpgradeModal }) {
     try {
       const data = await askRule(q.trim());
       setResult(data);
+      if (data.usage) {
+        setUsage(data.usage);
+      }
     } catch (err) {
+      if (err.message && err.message.toLowerCase().includes("limit reached")) {
+        setUsage((prev) => ({ ...prev, is_pro: false, limit: 5, used: 5, remaining: 0 }));
+        if (onOpenUpgradeModal) onOpenUpgradeModal();
+      }
       setError(err.message);
     } finally {
       setLoading(false);
@@ -218,12 +246,38 @@ function AskRules({ currentUser, onOpenUpgradeModal }) {
       <div className="rules-header">
         <div className="rules-title-row">
           <span className="rules-badge">Compliance Intelligence</span>
+          {isPro ? (
+            <span className="rules-quota-badge quota-pro">
+              <IconSparkles size={13} /> Pro: Unlimited Queries
+            </span>
+          ) : usage ? (
+            <span className={`rules-quota-badge ${usage.remaining === 0 ? "quota-exhausted" : ""}`}>
+              {usage.remaining === 0
+                ? "⚠️ Daily Limit Reached (5/5 Used)"
+                : `📊 Daily Quota: ${usage.used}/5 used (${usage.remaining} left today)`}
+            </span>
+          ) : null}
           <h2>Ask Regulatory Compliance Questions</h2>
         </div>
         <p className="rules-subtitle">
           Submit compliance and dispute resolution questions. Answers are mathematically synthesized strictly from verified legal citations and banking standards.
         </p>
       </div>
+
+      {!isPro && usage && usage.remaining === 0 && (
+        <div className="rules-limit-reached-banner">
+          <div className="limit-banner-content">
+            <span className="limit-icon"><IconAlert size={20} /></span>
+            <div>
+              <strong>Daily Free Limit Reached (5/5 Questions Asked)</strong>
+              <p>You have asked the maximum 5 compliance questions allowed per day on the Free tier. Upgrade to Pro for unlimited instant regulatory queries.</p>
+            </div>
+          </div>
+          <button type="button" className="limit-upgrade-btn" onClick={onOpenUpgradeModal}>
+            <IconSparkles size={15} /> Upgrade to Pro
+          </button>
+        </div>
+      )}
 
       <div className="quick-prompts">
         <span className="quick-label">Suggested Questions:</span>
@@ -254,14 +308,28 @@ function AskRules({ currentUser, onOpenUpgradeModal }) {
           <input
             type="text"
             className="rules-input"
-            placeholder="Type your compliance question here (e.g. Can debt collector call at 6 AM?)..."
+            placeholder={
+              isLimitReached
+                ? "Daily question limit of 5 reached. Upgrade to Pro to ask more..."
+                : "Type your compliance question here (e.g. Can debt collector call at 6 AM?)..."
+            }
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            disabled={loading}
+            disabled={loading || isLimitReached}
           />
-          <button type="submit" className="rules-submit" disabled={loading || !question.trim()}>
-            {loading ? "Searching Regulations..." : "Ask Rule"}
-          </button>
+          {isLimitReached ? (
+            <button
+              type="button"
+              className="rules-submit rules-limit-btn"
+              onClick={onOpenUpgradeModal}
+            >
+              <IconSparkles size={14} /> Upgrade to Pro
+            </button>
+          ) : (
+            <button type="submit" className="rules-submit" disabled={loading || !question.trim()}>
+              {loading ? "Searching Regulations..." : "Ask Rule"}
+            </button>
+          )}
         </div>
       </form>
 
