@@ -25,9 +25,7 @@ class AskRuleIn(BaseModel):
 @router.get("/usage")
 def get_regulations_usage(user=Depends(get_current_user)):
     """Returns today's question usage and remaining quota for Ask the Rules."""
-    super_admin = (settings.super_admin_email or "").strip().lower()
-    is_super = bool(super_admin and user["email"].lower() == super_admin)
-    is_pro = is_super or (user.get("plan") == "pro")
+    is_pro = user.get("plan") == "pro" and user.get("subscription_status") in ("active", "trialing")
 
     if is_pro:
         return {
@@ -65,9 +63,7 @@ def ask_regulation_rule(body: AskRuleIn, user=Depends(get_current_user)):
     """Answers a banking rule question using HNSW pgvector similarity + grounded LLM synthesis.
     Free tier accounts are limited to 5 questions per day; Pro tier has unlimited access.
     """
-    super_admin = (settings.super_admin_email or "").strip().lower()
-    is_super = bool(super_admin and user["email"].lower() == super_admin)
-    is_pro = is_super or (user.get("plan") == "pro")
+    is_pro = user.get("plan") == "pro" and user.get("subscription_status") in ("active", "trialing")
 
     current_count = 0
     if not is_pro:

@@ -32,8 +32,7 @@ function formatChange(pct) {
 }
 
 function Trends({ currentUser, onOpenUpgradeModal }) {
-  const isSuperAdmin = (currentUser?.email || "").toLowerCase().trim() === "piyushagrawal300504@gmail.com";
-  const isPro = isSuperAdmin || currentUser?.plan === "pro";
+  const isPro = currentUser?.plan === "pro" && (currentUser?.subscription_status === "active" || currentUser?.subscription_status === "trialing");
   const [groupBy, setGroupBy] = useState("product");
   const [timelineMode, setTimelineMode] = useState("presets"); // "presets" | "range"
 

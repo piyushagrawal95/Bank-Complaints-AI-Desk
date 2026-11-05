@@ -72,9 +72,7 @@ def get_current_user(creds: HTTPAuthorizationCredentials | None = Depends(bearer
         needs_db_fix = (user.get("role") != "admin" or not user.get("is_active"))
         user["role"] = "admin"
         user["is_active"] = True
-        user["plan"] = "pro"
-        user["subscription_status"] = "active"
-        # If DB row is not synced as admin/active, auto-heal DB row in background
+        # Note: plan and subscription_status reflect actual database subscription state
         if needs_db_fix:
             try:
                 with pool.connection() as fix_conn:
@@ -97,13 +95,13 @@ def require_role(*roles: str):
             raise HTTPException(status_code=403, detail="You do not have permission to do this")
         return user
     return checker
-def require_pro(user=Depends(get_current_user)):
-    """Enforce active Pro subscription plan (Super Admin has root owner access)."""
-    super_admin = (settings.super_admin_email or "").strip().lower()
-    is_super = bool(super_admin and user["email"].lower() == super_admin)
-    is_pro = user.get("plan") == "pro"
 
-    if is_super or is_pro:
+
+def require_pro(user=Depends(get_current_user)):
+    """Enforce active Pro subscription plan. Canceled subscriptions revert to Free."""
+    is_pro = user.get("plan") == "pro" and user.get("subscription_status") in ("active", "trialing")
+
+    if is_pro:
         return user
 
     raise HTTPException(

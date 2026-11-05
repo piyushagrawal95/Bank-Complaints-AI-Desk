@@ -134,17 +134,6 @@ def billing_status(user=Depends(get_current_user)):
             [user["id"]],
         ).fetchone()
 
-    super_admin = (settings.super_admin_email or "").strip().lower()
-    if super_admin and user["email"].lower() == super_admin:
-        if not row or row["plan"] != "pro":
-            return {
-                "plan": "pro",
-                "status": "active",
-                "current_period_end": None,
-                "cancel_at_period_end": False,
-                "is_super_admin": True,
-            }
-
     if not row:
         return {"plan": "free", "status": "none", "current_period_end": None, "cancel_at_period_end": False}
 
@@ -161,11 +150,11 @@ def create_checkout_session(request: Request, user=Depends(get_current_user)):
 
     with pool.connection() as conn:
         sub = conn.execute(
-            "SELECT plan, status FROM subscriptions WHERE user_id = %s",
+            "SELECT plan, status, cancel_at_period_end FROM subscriptions WHERE user_id = %s",
             [user["id"]]
         ).fetchone()
 
-    if sub and sub["plan"] == "pro" and sub["status"] in ("active", "trialing"):
+    if sub and sub["plan"] == "pro" and sub["status"] in ("active", "trialing") and not sub.get("cancel_at_period_end"):
         raise HTTPException(status_code=400, detail="You already have an active Pro plan")
 
     try:
@@ -258,11 +247,6 @@ def sync_billing(user=Depends(get_current_user)):
             [user["id"]],
         ).fetchone()
 
-    super_admin = (settings.super_admin_email or "").strip().lower()
-    if super_admin and user["email"].lower() == super_admin:
-        if not fresh or fresh["plan"] != "pro":
-            return {"plan": "pro", "status": "active", "current_period_end": None, "cancel_at_period_end": False}
-
     if not fresh:
         return {"plan": "free", "status": "none", "current_period_end": None, "cancel_at_period_end": False}
     return dict(fresh)
@@ -313,18 +297,42 @@ def _sync_subscription(conn, sub, event_created: int | None = None) -> None:
     if hasattr(sub, "to_dict"):
         sub = sub.to_dict()
 
-    status = sub.get("status") or "none"
-    plan = "pro" if status in ("active", "trialing") else "free"
+    raw_status = sub.get("status") or "none"
+    is_canceled = bool(
+        sub.get("canceled_at")
+        or sub.get("cancel_at")
+        or sub.get("cancel_at_period_end")
+        or raw_status in ("canceled", "unpaid", "incomplete_expired")
+        or (sub.get("cancellation_details") or {}).get("reason") in ("cancellation_requested", "cancellation_scheduled")
+    )
+
+    sub_id = sub.get("id")
+    customer_id = sub.get("customer")
+
+    if is_canceled:
+        plan = "free"
+        status = "canceled"
+        cancel_flag = True
+        if raw_status != "canceled" and sub_id:
+            try:
+                _ensure_stripe()
+                stripe.Subscription.cancel(sub_id)
+            except Exception:
+                pass
+    elif raw_status in ("active", "trialing"):
+        plan = "pro"
+        status = raw_status
+        cancel_flag = False
+    else:
+        plan = "free"
+        status = raw_status
+        cancel_flag = False
 
     period_end = sub.get("current_period_end")
     if not period_end:
         items = (sub.get("items") or {}).get("data") or []
         if items:
             period_end = items[0].get("current_period_end")
-
-    sub_id = sub.get("id")
-    customer_id = sub.get("customer")
-    cancel_flag = bool(sub.get("cancel_at_period_end"))
 
     # Out-of-order check: if event timestamp is older than current row updated_at, skip updating status
     event_dt = _ts(event_created) if event_created else None

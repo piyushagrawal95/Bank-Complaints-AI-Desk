@@ -699,7 +699,20 @@ function App() {
         });
       } else if (billingParam === "portal") {
         syncBillingStatus()
-          .then(() => getMe().then(setUser))
+          .then((res) => {
+            getMe().then(setUser);
+            if (res && (res.status === "canceled" || res.plan === "free")) {
+              setBillingNotice({
+                type: "info",
+                message: "Subscription status updated: Your account is on the Free tier.",
+              });
+            } else {
+              setBillingNotice({
+                type: "success",
+                message: "Billing settings updated successfully.",
+              });
+            }
+          })
           .catch(() => {});
       }
       const newUrl = window.location.pathname;
@@ -912,7 +925,7 @@ function App() {
         </div>
 
         <div className="userbox">
-          {user.plan === "pro" ? (
+          {user.plan === "pro" && (user.subscription_status === "active" || user.subscription_status === "trialing") ? (
             <span className="badge badge-pro" title="Active Pro Subscription">
               ★ PRO
             </span>
@@ -993,7 +1006,7 @@ function App() {
 
                   <div className="dropdown-divider"></div>
 
-                  {user.plan === "pro" ? (
+                  {user.plan === "pro" && (user.subscription_status === "active" || user.subscription_status === "trialing") ? (
                     <button
                       type="button"
                       className="dropdown-menu-item"
@@ -1258,8 +1271,12 @@ function App() {
               <div className="profile-row">
                 <span className="profile-lbl">Subscription Plan:</span>
                 <span className="profile-val">
-                  <span className={`badge ${user.plan === "pro" ? "badge-pro" : "badge-agent"}`}>
-                    {user.plan === "pro" ? "★ PRO PLAN (ACTIVE)" : "FREE TIER"}
+                  <span className={`badge ${user.plan === "pro" && (user.subscription_status === "active" || user.subscription_status === "trialing") ? "badge-pro" : "badge-agent"}`}>
+                    {user.plan === "pro" && (user.subscription_status === "active" || user.subscription_status === "trialing")
+                      ? "★ PRO PLAN (ACTIVE)"
+                      : user.subscription_status === "canceled"
+                      ? "FREE TIER (CANCELED)"
+                      : "FREE TIER"}
                   </span>
                 </span>
               </div>
@@ -1269,17 +1286,19 @@ function App() {
             <div className="profile-subscription-box">
               <div className="profile-sub-header">
                 <span className="profile-sub-title">Dispute Desk Plan</span>
-                <span className={`badge ${user.plan === "pro" ? "badge-pro" : "badge-agent"}`}>
-                  {user.plan === "pro" ? "★ PRO" : "FREE"}
+                <span className={`badge ${user.plan === "pro" && (user.subscription_status === "active" || user.subscription_status === "trialing") ? "badge-pro" : "badge-agent"}`}>
+                  {user.plan === "pro" && (user.subscription_status === "active" || user.subscription_status === "trialing") ? "★ PRO" : "FREE"}
                 </span>
               </div>
               <p style={{ margin: "0.25rem 0 0.5rem 0", fontSize: "0.82rem", color: "#64748b", lineHeight: 1.4 }}>
-                {user.plan === "pro"
+                {user.plan === "pro" && (user.subscription_status === "active" || user.subscription_status === "trialing")
                   ? "Your account enjoys unlimited AI categorization, deep regulatory RAG (Reg E, F, V, Z), and precedent letter drafting."
+                  : user.subscription_status === "canceled"
+                  ? "Your subscription was canceled. You are on the free tier. Upgrade anytime to reactivate unlimited AI insights."
                   : "Currently on standard tier. Upgrade to unlock unlimited AI intelligence, volume surge anomaly detection, and automated resolution dispatch."}
               </p>
               <div className="profile-sub-actions">
-                {user.plan === "pro" ? (
+                {user.plan === "pro" && (user.subscription_status === "active" || user.subscription_status === "trialing") ? (
                   <button
                     type="button"
                     className="btn-manage-billing"
@@ -1297,8 +1316,9 @@ function App() {
                       setShowProfileModal(false);
                       setShowUpgradeModal(true);
                     }}
+                    disabled={billingLoading}
                   >
-                    <IconSparkles size={14} /> Upgrade to Pro — ₹500/mo
+                    <IconSparkles size={15} /> Upgrade to Pro
                   </button>
                 )}
               </div>

@@ -120,16 +120,22 @@ def test_google_login_mock_token(client):
 
 
 
-def get_admin_user():
+def get_super_admin_user():
     from app.core.config import settings
     from app.db import pool
     super_admin = (settings.super_admin_email or "piyushagrawal300504@gmail.com").strip().lower()
     with pool.connection() as conn:
         u = conn.execute("SELECT id, email, role FROM users WHERE email = %s", [super_admin]).fetchone()
         if not u:
-            u = conn.execute("SELECT id, email, role FROM users WHERE role = 'admin' LIMIT 1").fetchone()
-        if not u:
             u = conn.execute("INSERT INTO users (email, password_hash, role, is_active) VALUES (%s, 'dummy_hash', 'admin', true) RETURNING id, email, role", [super_admin]).fetchone()
+        return u
+
+def get_admin_user():
+    from app.db import pool
+    with pool.connection() as conn:
+        u = conn.execute("SELECT id, email, role FROM users WHERE email = 'test_isolated_admin@bank.com'").fetchone()
+        if not u:
+            u = conn.execute("INSERT INTO users (email, password_hash, role, is_active) VALUES ('test_isolated_admin@bank.com', 'dummy_hash', 'admin', true) RETURNING id, email, role").fetchone()
         return u
 
 def get_agent_user():
@@ -142,7 +148,7 @@ def get_agent_user():
 
 def test_permanent_admin_protection(client):
     from app.security import create_access_token
-    admin = get_admin_user()
+    admin = get_super_admin_user()
     admin_token = create_access_token(user_id=admin["id"], role="admin")
     headers = {"Authorization": f"Bearer {admin_token}"}
 
@@ -170,8 +176,19 @@ def test_complaints_list_authenticated(client):
 
 def test_trends_spikes_rbac(client):
     from app.security import create_access_token
+    from app.db import pool
     admin = get_admin_user()
     agent = get_agent_user()
+    with pool.connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO subscriptions (user_id, plan, status, current_period_end)
+            VALUES (%s, 'pro', 'active', now() + interval '30 days')
+            ON CONFLICT (user_id) DO UPDATE SET plan = 'pro', status = 'active', cancel_at_period_end = false
+            """,
+            [admin["id"]],
+        )
+
     agent_token = create_access_token(user_id=agent["id"], role="agent")
     res_agent = client.get("/trends/spikes", headers={"Authorization": f"Bearer {agent_token}"})
     assert res_agent.status_code == 403
@@ -435,3 +452,27 @@ def test_pro_gating_enforcement(client):
     )
     assert r_analysis.status_code == 402
     assert "Pro Plan subscription" in r_analysis.json()["detail"]
+
+    # 4. If a user cancels their subscription, it must immediately revert to free and lock Pro features
+    with pool.connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO subscriptions (user_id, plan, status, cancel_at_period_end)
+            VALUES (%s, 'free', 'canceled', true)
+            ON CONFLICT (user_id) DO UPDATE SET plan = 'free', status = 'canceled', cancel_at_period_end = true
+            """,
+            [user["id"]],
+        )
+
+    r_status = client.get("/billing/status", headers={"Authorization": f"Bearer {token}"})
+    assert r_status.status_code == 200
+    assert r_status.json()["plan"] == "free"
+    assert r_status.json()["status"] == "canceled"
+
+    # And attempting draft reply while canceled yields 402
+    r_draft_canceled = client.post(
+        "/complaints/1/draft-reply",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"custom_instructions": "Should fail after cancellation"},
+    )
+    assert r_draft_canceled.status_code == 402

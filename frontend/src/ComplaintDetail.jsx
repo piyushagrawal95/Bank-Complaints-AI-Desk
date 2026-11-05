@@ -49,8 +49,7 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated, onOpenUpgra
   const [copied, setCopied] = useState(false);
 
   const isAgent = (currentUser?.role || "agent") === "agent";
-  const isSuperAdmin = (currentUser?.email || "").toLowerCase().trim() === "piyushagrawal300504@gmail.com";
-  const isPro = isSuperAdmin || currentUser?.plan === "pro";
+  const isPro = currentUser?.plan === "pro" && (currentUser?.subscription_status === "active" || currentUser?.subscription_status === "trialing");
 
   useEffect(() => {
     let cancelled = false;
