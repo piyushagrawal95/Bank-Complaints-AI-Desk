@@ -18,6 +18,7 @@ if not sql_dir.exists():
 # Explicit dependency execution order to satisfy foreign keys and vector extensions
 ORDERED_FILES = [
     "create_users.sql",
+    "create_subscriptions.sql",
     "create_complaints.sql",
     "create_regulations.sql",
     "create_complaint_embeddings.sql",

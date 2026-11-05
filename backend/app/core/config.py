@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     vercel_url: str = os.getenv("VERCEL_URL", "")
     turnstile_secret_key: str = os.getenv("TURNSTILE_SECRET_KEY", "")
 
+    stripe_secret_key : str=os.getenv("STRIPE_SECRET_KEY","")
+    stripe_publishable_key:str=os.getenv("STRIPE_PUBLISHABLE_KEY","")
+    stripe_price_id:str=os.getenv("STRIPE_PRICE_ID","")
+    stripe_webhook_secret:str=os.getenv("STRIPE_WEBHOOK_SECRET","")
+
 
     environment: str = os.getenv("ENVIRONMENT", "production")
 

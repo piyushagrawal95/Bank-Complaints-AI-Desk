@@ -11,7 +11,7 @@ from slowapi import _rate_limit_exceeded_handler
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.db import pool
-from app.routes import ai, auth, complaints, regulations, trends
+from app.routes import ai, auth,billing, complaints, regulations, trends
 
 
 @asynccontextmanager
@@ -67,6 +67,8 @@ app.include_router(complaints.router)
 app.include_router(regulations.router)
 app.include_router(trends.router)
 app.include_router(ai.router)
+app.include_router(billing.router)
+app.include_router(billing.webhook_router)
 
 
 @app.get("/health")
