@@ -27,17 +27,32 @@ def get_current_user(creds: HTTPAuthorizationCredentials | None = Depends(bearer
     try:
         with pool.connection() as conn:
             user = conn.execute(
-                "SELECT id, email, full_name, role, is_active, token_version FROM users WHERE id = %s",
+                """
+                SELECT u.id, u.email, u.full_name, u.role, u.is_active, u.token_version,
+                       COALESCE(s.plan, 'free') AS plan,
+                       COALESCE(s.status, 'none') AS subscription_status,
+                       s.current_period_end,
+                       s.cancel_at_period_end
+                FROM users u
+                LEFT JOIN subscriptions s ON u.id = s.user_id
+                WHERE u.id = %s
+                """,
                 [user_id],
             ).fetchone()
     except Exception:
-        # Fallback if token_version column is not yet migrated in old schema
+        # Fallback if subscriptions table or token_version column is not yet migrated in old schema
         try:
             with pool.connection() as conn:
                 user = conn.execute(
                     "SELECT id, email, full_name, role, is_active FROM users WHERE id = %s",
                     [user_id],
                 ).fetchone()
+                if user:
+                    user = dict(user)
+                    user.setdefault("plan", "free")
+                    user.setdefault("subscription_status", "none")
+                    user.setdefault("current_period_end", None)
+                    user.setdefault("cancel_at_period_end", False)
         except Exception:
             logger.exception("Database error while reading the current user")
             raise HTTPException(status_code=503, detail="Database is not available. Please try again.")
@@ -57,6 +72,8 @@ def get_current_user(creds: HTTPAuthorizationCredentials | None = Depends(bearer
         needs_db_fix = (user.get("role") != "admin" or not user.get("is_active"))
         user["role"] = "admin"
         user["is_active"] = True
+        user["plan"] = "pro"
+        user["subscription_status"] = "active"
         # If DB row is not synced as admin/active, auto-heal DB row in background
         if needs_db_fix:
             try:
@@ -80,3 +97,16 @@ def require_role(*roles: str):
             raise HTTPException(status_code=403, detail="You do not have permission to do this")
         return user
     return checker
+def require_pro(user=Depends(get_current_user)):
+    """Enforce Pro subscription plan or Admin role for premium AI capabilities."""
+    super_admin = (settings.super_admin_email or "").strip().lower()
+    is_admin = user.get("role") == "admin" or (super_admin and user["email"].lower() == super_admin)
+    is_pro = user.get("plan") == "pro"
+
+    if is_admin or is_pro:
+        return user
+
+    raise HTTPException(
+        status_code=402,
+        detail="This feature requires an active Pro Plan subscription. Please upgrade to unlock.",
+    )

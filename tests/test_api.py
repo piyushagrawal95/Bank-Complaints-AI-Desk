@@ -278,3 +278,139 @@ def test_complaint_file_extraction(client):
     assert extracted["consumer_email"] == "alice.smith@finance.org"
     assert extracted["state"] == "TX"
     assert "Checking or savings account" in extracted["product"] or "Credit card" in extracted["product"]
+# -------------------------------------------------------------
+# STRIPE BILLING & SUBSCRIPTION INTEGRATION TESTS
+# -------------------------------------------------------------
+
+def test_billing_unauthorized(client):
+    r1 = client.get("/billing/status")
+    assert r1.status_code == 401
+    r2 = client.post("/billing/checkout")
+    assert r2.status_code == 401
+    r3 = client.post("/billing/portal")
+    assert r3.status_code == 401
+    r4 = client.post("/billing/sync")
+    assert r4.status_code == 401
+
+
+def test_billing_config(client):
+    from app.security import create_access_token
+    agent = get_agent_user()
+    token = create_access_token(user_id=agent["id"], role="agent")
+    res = client.get("/billing/config", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "configured" in data
+    assert data["plan_name"] == "AI Pro Plan"
+    assert data["amount"] == 500
+    assert data["currency"].upper() == "INR"
+
+
+def test_billing_status_authorized(client):
+    from app.security import create_access_token
+    agent = get_agent_user()
+    token = create_access_token(user_id=agent["id"], role="agent")
+    res = client.get("/billing/status", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "plan" in data
+    assert data["plan"] in ("free", "pro")
+
+
+def test_billing_webhook_security(client):
+    # Missing or invalid stripe-signature should be immediately rejected
+    res = client.post(
+        "/billing/webhook",
+        headers={"stripe-signature": "t=123,v1=invalid_fake_sig"},
+        content=b'{"id": "evt_test", "type": "checkout.session.completed"}',
+    )
+    assert res.status_code in (400, 503)
+
+
+def get_isolated_test_user():
+    from app.db import pool
+    with pool.connection() as conn:
+        u = conn.execute("SELECT id, email, role FROM users WHERE email = 'test_isolated_billing@bank.com'").fetchone()
+        if not u:
+            u = conn.execute(
+                "INSERT INTO users (email, password_hash, role, is_active) VALUES ('test_isolated_billing@bank.com', 'dummy_hash', 'agent', true) RETURNING id, email, role"
+            ).fetchone()
+        return u
+
+
+def test_billing_checkout_and_portal_mocked(client):
+    from unittest.mock import patch, MagicMock
+    from app.security import create_access_token
+    from app.core.config import settings
+    from app.db import pool
+
+    user = get_isolated_test_user()
+    token = create_access_token(user_id=user["id"], role="agent")
+
+    mock_cust = MagicMock(id="cus_test_mock_isolated")
+    mock_session = MagicMock(url="https://checkout.stripe.com/pay/cs_test_mock")
+    mock_portal = MagicMock(url="https://billing.stripe.com/p/session/test_mock")
+
+    # Clean previous test subscription data
+    with pool.connection() as conn:
+        conn.execute("DELETE FROM subscriptions WHERE user_id = %s", [user["id"]])
+
+    with patch.object(settings, "stripe_secret_key", "sk_test_mock_for_ci"),          patch.object(settings, "stripe_price_id", "price_mock_for_ci"),          patch("stripe.Customer.create", return_value=mock_cust),          patch("stripe.checkout.Session.create", return_value=mock_session),          patch("stripe.billing_portal.Session.create", return_value=mock_portal):
+
+        # 1. Checkout session test
+        r_checkout = client.post(
+            "/billing/checkout",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r_checkout.status_code == 200
+        assert r_checkout.json()["url"] == "https://checkout.stripe.com/pay/cs_test_mock"
+
+        # 2. Portal session test
+        r_portal = client.post(
+            "/billing/portal",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r_portal.status_code == 200
+        assert r_portal.json()["url"] == "https://billing.stripe.com/p/session/test_mock"
+
+    # Cleanup isolated test data so real database is never polluted
+    with pool.connection() as conn:
+        conn.execute("DELETE FROM subscriptions WHERE user_id = %s", [user["id"]])
+
+
+def test_pro_gating_enforcement(client):
+    from app.security import create_access_token
+    from app.db import pool
+
+    # Free agent without Pro subscription
+    user = get_isolated_test_user()
+    with pool.connection() as conn:
+        conn.execute("DELETE FROM subscriptions WHERE user_id = %s", [user["id"]])
+
+    token = create_access_token(user_id=user["id"], role="agent")
+
+    # 1. Draft reply should be rejected with 402 Payment Required
+    r_draft = client.post(
+        "/complaints/1/draft-reply",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"custom_instructions": "Test instructions"},
+    )
+    assert r_draft.status_code == 402
+    assert "Pro Plan subscription" in r_draft.json()["detail"]
+
+    # 2. Ask Regulations should be rejected with 402 Payment Required
+    r_ask = client.post(
+        "/regulations/ask",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"question": "What is the timeline for error resolution?"},
+    )
+    assert r_ask.status_code == 402
+    assert "Pro Plan subscription" in r_ask.json()["detail"]
+
+    # 3. AI Analysis should be rejected with 402 Payment Required
+    r_analysis = client.post(
+        "/complaints/1/analysis",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r_analysis.status_code == 402
+    assert "Pro Plan subscription" in r_analysis.json()["detail"]

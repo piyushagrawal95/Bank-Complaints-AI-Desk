@@ -20,7 +20,7 @@ import {
 } from "./Icons";
 import "./ComplaintDetail.css";
 
-function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
+function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated, onOpenUpgradeModal }) {
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -49,6 +49,7 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
   const [copied, setCopied] = useState(false);
 
   const isAgent = (currentUser?.role || "agent") === "agent";
+  const isPro = currentUser?.role === "admin" || currentUser?.plan === "pro";
 
   useEffect(() => {
     let cancelled = false;
@@ -103,13 +104,22 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
   }
 
   async function runAnalysis(refresh = false) {
+    if (!isPro) {
+      if (onOpenUpgradeModal) onOpenUpgradeModal();
+      return;
+    }
     setAnalyzing(true);
     setAnalyzeError(null);
     try {
       const data = await analyzeComplaint(id, refresh);
       setAnalysis(data);
     } catch (err) {
-      setAnalyzeError(err.message);
+      if (err.message && (err.message.includes("402") || err.message.toLowerCase().includes("pro plan"))) {
+        setAnalyzeError("🔒 Pro Feature: Upgrade to Pro Plan to generate instant AI root-cause classification and executive summaries.");
+        if (onOpenUpgradeModal) onOpenUpgradeModal();
+      } else {
+        setAnalyzeError(err.message);
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -130,6 +140,10 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
   }
 
   async function generateDraft() {
+    if (!isPro) {
+      if (onOpenUpgradeModal) onOpenUpgradeModal();
+      return;
+    }
     setDrafting(true);
     setApprovalFeedback(null);
     try {
@@ -137,7 +151,12 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
       setReplyDraft(res.draft);
       setResponseRecord(null);
     } catch (err) {
-      alert("Error generating reply draft: " + err.message);
+      if (err.message && (err.message.includes("402") || err.message.toLowerCase().includes("pro plan"))) {
+        alert("🔒 Pro Feature: Upgrade to Pro Plan to auto-draft resolution letters.");
+        if (onOpenUpgradeModal) onOpenUpgradeModal();
+      } else {
+        alert("Error generating reply draft: " + err.message);
+      }
     } finally {
       setDrafting(false);
     }
@@ -364,7 +383,7 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
                     </div>
                     <p className="summary-text">{analysis.summary}</p>
                   </div>
-                ) : (
+                ) : isPro ? (
                   <button
                     className="ai-trigger-btn"
                     disabled={analyzing}
@@ -372,6 +391,19 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
                   >
                     {analyzing ? "Analyzing with AI..." : (<><IconSparkles size={15} /> Analyze with AI</>)}
                   </button>
+                ) : (
+                  <div className="pro-lock-banner">
+                    <div className="pro-lock-content">
+                      <span className="pro-lock-icon">🔒</span>
+                      <div>
+                        <strong>AI Categorization & Executive Brief is a Pro Feature</strong>
+                        <p>Unlock instant root-cause taxonomy and cached summaries.</p>
+                      </div>
+                    </div>
+                    <button type="button" className="btn-upgrade-pro" style={{ margin: 0 }} onClick={onOpenUpgradeModal}>
+                      <IconSparkles size={14} /> Upgrade to Pro
+                    </button>
+                  </div>
                 )}
                 {analyzeError && (
                   <div className="server-error-banner" style={{ margin: "0.8rem 0" }}>
@@ -488,9 +520,15 @@ function ComplaintDetail({ id, currentUser, onClose, onEmailUpdated }) {
               <section className="section-block">
                 <div className="section-head-row">
                   <h3>Official Bank Resolution Letter</h3>
-                  <button className="draft-ai-btn" disabled={drafting} onClick={generateDraft}>
-                    {drafting ? "Drafting with AI..." : replyDraft ? "Regenerate Draft" : "Draft Reply with AI"}
-                  </button>
+                  {isPro ? (
+                    <button className="draft-ai-btn" disabled={drafting} onClick={generateDraft}>
+                      {drafting ? "Drafting with AI..." : replyDraft ? "Regenerate Draft" : "Draft Reply with AI"}
+                    </button>
+                  ) : (
+                    <button type="button" className="draft-ai-btn" onClick={onOpenUpgradeModal} title="Pro Feature">
+                      🔒 Draft with AI (Pro)
+                    </button>
+                  )}
                 </div>
 
                 {approvalFeedback && (

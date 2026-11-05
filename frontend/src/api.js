@@ -292,3 +292,9 @@ export async function verifyEmail(token) {
     body: { token },
   });
 }
+// Billing & Subscriptions (Stripe)
+export const getBillingConfig = () => request("/billing/config");
+export const getBillingStatus = () => request("/billing/status");
+export const createCheckoutSession = () => request("/billing/checkout", { method: "POST" });
+export const createPortalSession = () => request("/billing/portal", { method: "POST" });
+export const syncBillingStatus = () => request("/billing/sync", { method: "POST" });

@@ -7,7 +7,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from app.core.config import settings
 from app.db import pool
-from app.deps import get_current_user, require_role
+from app.deps import get_current_user, require_role, require_pro
 from app.email_service import send_complaint_approval_email, send_supervisor_approval_request_email, send_agent_rejection_notification_email
 from app.file_extractor import extract_raw_text, parse_complaint_from_text, extract_complaints_from_file
 from app.llm.analysis import (
@@ -573,7 +573,7 @@ def update_complaint_email(complaint_id: int, body: UpdateEmailIn, user=Depends(
 
 
 @router.post("/{complaint_id}/analysis")
-def analyze_complaint(complaint_id: int, refresh: bool = False):
+def analyze_complaint(complaint_id: int, refresh: bool = False, user=Depends(require_pro)):
     """Classify and summarize one complaint with LLM, saving result in cache table."""
     try:
         with pool.connection() as conn:
@@ -680,7 +680,7 @@ def similar_complaints(complaint_id: int, top_k: int = Query(3, ge=1, le=10)):
 
 
 @router.post("/{complaint_id}/draft-reply")
-def draft_complaint_reply(complaint_id: int, body: DraftReplyIn | None = None):
+def draft_complaint_reply(complaint_id: int, body: DraftReplyIn | None = None, user=Depends(require_pro)):
     """Draft an official bank reply letter for human approval using similar cases and regulation rules."""
     try:
         with pool.connection() as conn:

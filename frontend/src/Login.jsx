@@ -78,7 +78,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
     if (widgetIdRef.current !== null && window.turnstile) {
       try {
         window.turnstile.reset(widgetIdRef.current);
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -101,7 +101,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
           if (widgetIdRef.current !== null) {
             try {
               window.turnstile.remove(widgetIdRef.current);
-            } catch (e) {
+            } catch {
               // ignore
             }
             widgetIdRef.current = null;
@@ -143,7 +143,7 @@ function Login({ onLoggedIn, initialMode = "login", _onClose = null }) {
       if (widgetIdRef.current !== null && window.turnstile) {
         try {
           window.turnstile.remove(widgetIdRef.current);
-        } catch (e) {
+        } catch {
           // ignore
         }
         widgetIdRef.current = null;

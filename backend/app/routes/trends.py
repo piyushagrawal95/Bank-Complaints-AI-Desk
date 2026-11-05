@@ -3,13 +3,13 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.db import pool
-from app.deps import require_role
+from app.deps import require_role, require_pro
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/trends",
     tags=["trends"],
-    dependencies=[Depends(require_role("supervisor", "admin"))],
+    dependencies=[Depends(require_role("supervisor", "admin")), Depends(require_pro)],
 )
 
 GROUP_COLUMNS = {"product": "product", "issue": "issue", "company": "company"}

@@ -14,6 +14,7 @@ AI-powered Complaint Intelligence & Regulatory Compliance System for Banks (CFPB
 - **Trends & Volume Spike Detection**: Anomaly detection comparing rolling window traffic against historical baselines with supervisor alerts.
 - **Full Authentication & RBAC**: Scrypt password hashing, JWT tokens, Google OAuth 2.0 with clock-skew tolerance, Cloudflare Turnstile CAPTCHA, and role enforcement (`agent`, `supervisor`, `admin`).
 - **Switchable AI Models**: Change between Groq and OpenAI via `.env` settings without modifying code.
+- **Stripe Pro Billing & Access Gating**: Dual-tier monetization (Free vs AI Pro Plan). AI Categorization, 'Ask the Rules' RAG, Precedent Reply Drafting, and Anomaly Spikes are enforced via `require_pro` backend dependencies, dynamic Stripe pricing, and signed webhook lifecycle sync.
 
 ---
 

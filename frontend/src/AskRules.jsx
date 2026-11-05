@@ -152,7 +152,8 @@ function detectRegulations(text, citations = []) {
   return Array.from(regs);
 }
 
-function AskRules() {
+function AskRules({ currentUser, onOpenUpgradeModal }) {
+  const isPro = currentUser?.role === "admin" || currentUser?.plan === "pro";
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -177,6 +178,10 @@ function AskRules() {
   async function handleAsk(qToAsk) {
     const q = qToAsk || question;
     if (!q.trim()) return;
+    if (!isPro) {
+      if (onOpenUpgradeModal) onOpenUpgradeModal();
+      return;
+    }
     setLoading(true);
     setError(null);
     setResult(null);

@@ -22,6 +22,7 @@
    - 4.4 [Semantic Precedent Matching & Human-in-the-Loop Response Drafting](#44-semantic-precedent-matching--human-in-the-loop-response-drafting)
    - 4.5 [Time-Series Anomaly Detection & Volume Spike Alerts](#45-time-series-anomaly-detection--volume-spike-alerts)
    - 4.6 [Enterprise Security, Cryptography & Multi-Tier RBAC](#46-enterprise-security-cryptography--multi-tier-rbac)
+   - 4.7 [Pro Subscription Monetization & Stripe Lifecycle Architecture](#47-pro-subscription-monetization--stripe-lifecycle-architecture)
 5. [Complete Database Schema & Data Dictionary](#5-complete-database-schema--data-dictionary)
 6. [Complete REST API Specification](#6-complete-rest-api-specification)
 7. [Engineering Challenges, Experiments & Root-Cause Solutions](#7-engineering-challenges-experiments--root-cause-solutions)
@@ -181,6 +182,27 @@ Every technology in this system was selected based on rigorous engineering evalu
 * **Google OAuth2 Integration**: Features **60-second clock-skew tolerance** (`clock_skew_in_seconds=60`) to accommodate discrepancies between Windows client clocks and Google authorization servers.
 * **Permanent Super Admin Invariant**: The designated system owner (`piyushagrawal300504@gmail.com`) is hardcoded with root immunity: backend route `/auth/users/role` unconditionally rejects any attempt to downgrade or deactivate the root admin.
 
+### 4.7 Pro Subscription Monetization & Stripe Lifecycle Architecture
+The platform implements a tiered access model separating baseline frontline dispute desk capabilities from advanced AI automation features:
+
+| Platform Capability | Free Desk Tier | AI Pro Plan (₹500/mo) | Enforcement Mechanism |
+|---|---|---|---|
+| **Dispute Search & Filter** | Full Access | Full Access | Open |
+| **Manual Dispute Entry** | Full Access | Full Access | Open |
+| **Multi-Format Ingestion (PDF/Word/Excel)** | Full Access | Full Access | Open |
+| **AI Root-Cause Categorization** | 🔒 Locked | Full Access | `require_pro` (HTTP 402) |
+| **2-Sentence Executive Briefs** | 🔒 Locked | Full Access | `require_pro` (HTTP 402) |
+| **"Ask the Rules" Multi-Reg RAG** | 🔒 Locked | Full Access | `require_pro` (HTTP 402) |
+| **Precedent AI Response Drafting** | 🔒 Locked | Full Access | `require_pro` (HTTP 402) |
+| **Volume Surge Anomaly Trends** | 🔒 Locked | Full Access | `require_pro` (HTTP 402) |
+| **Automated Email Dispatch** | Standard | Priority | Operational |
+
+* **Architectural Implementation Details**:
+  * **Cryptographic Plan Gating**: Sensitive AI inference routes (`/complaints/{id}/analysis`, `/complaints/{id}/draft-reply`, `/regulations/ask`, `/trends/spikes`) require the `require_pro` dependency in `backend/app/deps.py`, returning HTTP 402 (`Payment Required`) if unverified.
+  * **Dynamic Stripe Price Sync**: Rather than hardcoding costs, `GET /billing/config` queries Stripe API (`stripe.Price.retrieve`) with in-memory caching to reflect currency and price updates in real-time.
+  * **Out-of-Order Webhook Protection**: Incoming Stripe events compare the event creation timestamp against `subscriptions.updated_at` to prevent delayed webhooks from overwriting fresh subscription states.
+  * **On-Demand Subscription Sync**: `POST /billing/sync` queries Stripe directly upon return from checkout (`/?billing=success`), ensuring instant Pro activation even before asynchronous webhooks complete.
+
 ---
 
 ## 5. Complete Database Schema & Data Dictionary
@@ -194,6 +216,8 @@ The PostgreSQL database is organized into 7 normalized tables:
 5. **`complaint_responses`**: Stores official human-approved response letters, approver ID, name, role, timestamps, and dispatch status.
 6. **`users`**: Manages accounts, scrypt password hashes, roles (`agent`, `supervisor`, `admin`), and active flags.
 7. **`password_reset_tokens`**: Stores SHA-256 hashed 15-minute reset tokens for secure email password resets.
+8. **`subscriptions`**: Stores user subscription plan (`free`, `pro`), Stripe customer ID, subscription ID, status (`active`, `trialing`, `canceled`), and billing period end.
+9. **`stripe_events`**: Dedupes and audit-logs processed Stripe webhook event IDs to prevent duplicate transaction replays.
 
 ---
 

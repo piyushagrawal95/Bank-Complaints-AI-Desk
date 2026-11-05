@@ -9,6 +9,10 @@ import {
   getToken,
   requestRoleUpgrade,
   setUnauthorizedHandler,
+  createCheckoutSession,
+  createPortalSession,
+  getBillingConfig,
+  syncBillingStatus,
 } from "./api";
 import AskRules from "./AskRules";
 import ComplaintDetail from "./ComplaintDetail";
@@ -86,7 +90,7 @@ function renderResponseBadge(resp = "") {
   return <span className="response-pill resp-default">{resp || "Under Review"}</span>;
 }
 
-function ComplaintsPage({ currentUser, initialSelectedId = null }) {
+function ComplaintsPage({ currentUser, initialSelectedId = null, onOpenUpgradeModal }) {
   const [draft, setDraft] = useState(EMPTY);
   const [filters, setFilters] = useState(EMPTY);
   const [page, setPage] = useState(1);
@@ -336,6 +340,7 @@ function ComplaintsPage({ currentUser, initialSelectedId = null }) {
           currentUser={currentUser}
           onClose={() => setSelectedId(null)}
           onEmailUpdated={handleEmailUpdated}
+          onOpenUpgradeModal={onOpenUpgradeModal}
         />
       )}
 
@@ -523,6 +528,10 @@ function App() {
   const [upgradeError, setUpgradeError] = useState(null);
   const [livePromotionNotice, setLivePromotionNotice] = useState(null);
   const [showCelebrationCard, setShowCelebrationCard] = useState(true);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [billingNotice, setBillingNotice] = useState(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingConfig, setBillingConfig] = useState(null);
   const profileTimeoutRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -592,6 +601,34 @@ function App() {
     }
   };
 
+  const handleUpgradeToPro = async () => {
+    setBillingLoading(true);
+    try {
+      const res = await createCheckoutSession();
+      if (res?.url) {
+        window.location.href = res.url;
+      }
+    } catch (err) {
+      alert(err.message || "Failed to start Stripe checkout.");
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    setBillingLoading(true);
+    try {
+      const res = await createPortalSession();
+      if (res?.url) {
+        window.location.href = res.url;
+      }
+    } catch (err) {
+      alert(err.message || "Failed to open Stripe billing portal.");
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
   const handleProfileEnter = () => {
     if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
     setProfileOpen(true);
@@ -639,6 +676,44 @@ function App() {
       clearToken();
       setUser(null);
     });
+  }, []);
+
+  // Handle Stripe billing return redirects
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const billingParam = params.get("billing");
+    if (billingParam) {
+      if (billingParam === "success") {
+        setBillingNotice({
+          type: "success",
+          message: "Payment Successful! Welcome to Pro Plan. Unlimited AI analysis and regulatory compliance features are now active.",
+        });
+        syncBillingStatus()
+          .then(() => getMe().then(setUser))
+          .catch(() => {});
+      } else if (billingParam === "cancel") {
+        setBillingNotice({
+          type: "cancel",
+          message: "Checkout canceled. No charges were made. You can upgrade to Pro anytime.",
+        });
+      } else if (billingParam === "portal") {
+        syncBillingStatus()
+          .then(() => getMe().then(setUser))
+          .catch(() => {});
+      }
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!billingNotice) return;
+    const timer = setTimeout(() => setBillingNotice(null), 7000);
+    return () => clearTimeout(timer);
+  }, [billingNotice]);
+
+  useEffect(() => {
+    getBillingConfig().then(setBillingConfig).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -798,6 +873,23 @@ function App() {
 
   return (
     <div className="container">
+      {billingNotice && (
+        <div className={`billing-toast billing-toast-${billingNotice.type}`}>
+          <div className="billing-toast-content">
+            <span className="billing-toast-icon">
+              {billingNotice.type === "success" ? "🎉" : "ℹ️"}
+            </span>
+            <span>{billingNotice.message}</span>
+          </div>
+          <button
+            type="button"
+            className="billing-toast-close"
+            onClick={() => setBillingNotice(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {livePromotionNotice && (
         <div className="live-promotion-toast">
           <div className="live-toast-content">
@@ -819,6 +911,20 @@ function App() {
         </div>
 
         <div className="userbox">
+          {user.plan === "pro" ? (
+            <span className="badge badge-pro" title="Active Pro Subscription">
+              ★ PRO
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="btn-upgrade-pro"
+              onClick={() => setShowUpgradeModal(true)}
+              title="Upgrade to Pro Plan for unlimited AI power"
+            >
+              <IconSparkles size={14} /> Upgrade to Pro
+            </button>
+          )}
           <div
             ref={dropdownRef}
             className="user-dropdown-wrapper"
@@ -881,6 +987,36 @@ function App() {
                     >
                       <IconUsers size={15} />
                       <span>User Management Portal</span>
+                    </button>
+                  )}
+
+                  <div className="dropdown-divider"></div>
+
+                  {user.plan === "pro" ? (
+                    <button
+                      type="button"
+                      className="dropdown-menu-item"
+                      onClick={() => {
+                        if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+                        setProfileOpen(false);
+                        handleManageSubscription();
+                      }}
+                    >
+                      <span style={{ color: "#f59e0b", fontSize: "14px" }}>★</span>
+                      <span>Manage Pro Subscription</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="dropdown-menu-item"
+                      onClick={() => {
+                        if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+                        setProfileOpen(false);
+                        setShowUpgradeModal(true);
+                      }}
+                    >
+                      <IconSparkles size={15} style={{ color: "#6366f1" }} />
+                      <span>Upgrade to Pro (₹500/mo)</span>
                     </button>
                   )}
 
@@ -958,7 +1094,7 @@ function App() {
 
       <main className="main-content">
         {view === "rules" ? (
-          <AskRules />
+          <AskRules currentUser={user} onOpenUpgradeModal={() => setShowUpgradeModal(true)} />
         ) : view === "new-complaint" ? (
           <NewComplaint
             onViewComplaint={(newId) => {
@@ -979,13 +1115,104 @@ function App() {
             onRefreshCount={(c) => setPendingApprovalsCount(c)}
           />
         ) : showTrends ? (
-          <Trends />
+          <Trends currentUser={user} onOpenUpgradeModal={() => setShowUpgradeModal(true)} />
         ) : view === "users" && canManageUsers ? (
           <UserManagement currentUser={user} />
         ) : (
-          <ComplaintsPage currentUser={user} initialSelectedId={directSelectedId} />
+          <ComplaintsPage currentUser={user} initialSelectedId={directSelectedId} onOpenUpgradeModal={() => setShowUpgradeModal(true)} />
         )}
       </main>
+
+      {/* Pro Plan Upgrade Modal */}
+      {showUpgradeModal && (
+        <div
+          className="upgrade-modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowUpgradeModal(false);
+          }}
+        >
+          <div className="upgrade-modal-card">
+            <div className="upgrade-modal-head">
+              <div>
+                <h3>Upgrade to Bank Complaint AI Pro</h3>
+                <p>Empower your dispute desk with enterprise-grade compliance AI</p>
+              </div>
+              <button
+                type="button"
+                className="secondary"
+                style={{ padding: "0.3rem 0.65rem", fontSize: "0.85rem" }}
+                onClick={() => setShowUpgradeModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="upgrade-price-badge">
+              <span className="upgrade-price-amount">{billingConfig?.formatted_price ? billingConfig.formatted_price.split("/")[0].trim() : "₹500"}</span>
+              <span className="upgrade-price-interval">/ {billingConfig?.interval || "month"} (Auto-renews, cancel anytime)</span>
+            </div>
+
+            <div className="upgrade-feature-list">
+              <div className="upgrade-feature-item">
+                <span className="upgrade-feature-check">✓</span>
+                <div>
+                  <strong>Unlimited AI Complaint Categorization</strong>
+                  <div style={{ fontSize: "0.78rem", color: "#64748b" }}>Sub-second root-cause taxonomy mapping with executive summaries</div>
+                </div>
+              </div>
+              <div className="upgrade-feature-item">
+                <span className="upgrade-feature-check">✓</span>
+                <div>
+                  <strong>Multi-Regulation "Ask the Rules" RAG Engine</strong>
+                  <div style={{ fontSize: "0.78rem", color: "#64748b" }}>Search 12,800+ legal chunks with exact CFR section citations (Reg E, F, V, Z)</div>
+                </div>
+              </div>
+              <div className="upgrade-feature-item">
+                <span className="upgrade-feature-check">✓</span>
+                <div>
+                  <strong>Precedent Retrieval & AI Draft Reply Letters</strong>
+                  <div style={{ fontSize: "0.78rem", color: "#64748b" }}>Vector match past disputes and generate audit-proof customer resolution drafts</div>
+                </div>
+              </div>
+              <div className="upgrade-feature-item">
+                <span className="upgrade-feature-check">✓</span>
+                <div>
+                  <strong>Automated Email Dispatch & Customer Notifications</strong>
+                  <div style={{ fontSize: "0.78rem", color: "#64748b" }}>Immediate delivery of approved resolutions to consumers via Maileroo / Gmail</div>
+                </div>
+              </div>
+              <div className="upgrade-feature-item">
+                <span className="upgrade-feature-check">✓</span>
+                <div>
+                  <strong>Time-Series Anomaly & Outage Surge Detection</strong>
+                  <div style={{ fontSize: "0.78rem", color: "#64748b" }}>Real-time spike monitoring across products, issues, and partner banks</div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="upgrade-btn-stripe"
+              onClick={handleUpgradeToPro}
+              disabled={billingLoading}
+            >
+              {billingLoading ? (
+                <>
+                  <span className="inline-spinner" style={{ borderTopColor: "#fff" }}></span>
+                  Connecting to Stripe Checkout...
+                </>
+              ) : (
+                <>
+                  <IconShield size={18} /> Proceed to Secure Stripe Checkout →
+                </>
+              )}
+            </button>
+            <div className="upgrade-footer-note">
+              🔒 Encrypted 256-bit Stripe Checkout. Instant activation upon completion.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* User Profile Details Modal */}
       {showProfileModal && (
@@ -1027,6 +1254,53 @@ function App() {
                 </span>
               </div>
 
+              <div className="profile-row">
+                <span className="profile-lbl">Subscription Plan:</span>
+                <span className="profile-val">
+                  <span className={`badge ${user.plan === "pro" ? "badge-pro" : "badge-agent"}`}>
+                    {user.plan === "pro" ? "★ PRO PLAN (ACTIVE)" : "FREE TIER"}
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            {/* Subscription Management Box */}
+            <div className="profile-subscription-box">
+              <div className="profile-sub-header">
+                <span className="profile-sub-title">Dispute Desk Plan</span>
+                <span className={`badge ${user.plan === "pro" ? "badge-pro" : "badge-agent"}`}>
+                  {user.plan === "pro" ? "★ PRO" : "FREE"}
+                </span>
+              </div>
+              <p style={{ margin: "0.25rem 0 0.5rem 0", fontSize: "0.82rem", color: "#64748b", lineHeight: 1.4 }}>
+                {user.plan === "pro"
+                  ? "Your account enjoys unlimited AI categorization, deep regulatory RAG (Reg E, F, V, Z), and precedent letter drafting."
+                  : "Currently on standard tier. Upgrade to unlock unlimited AI intelligence, volume surge anomaly detection, and automated resolution dispatch."}
+              </p>
+              <div className="profile-sub-actions">
+                {user.plan === "pro" ? (
+                  <button
+                    type="button"
+                    className="btn-manage-billing"
+                    onClick={handleManageSubscription}
+                    disabled={billingLoading}
+                  >
+                    {billingLoading ? "Opening..." : "Manage Billing & Invoices (Stripe Portal) ↗"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-upgrade-pro"
+                    style={{ margin: 0 }}
+                    onClick={() => {
+                      setShowProfileModal(false);
+                      setShowUpgradeModal(true);
+                    }}
+                  >
+                    <IconSparkles size={14} /> Upgrade to Pro — ₹500/mo
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Role Elevation Section (For Non-Admins) */}

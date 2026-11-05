@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.db import pool
-from app.deps import get_current_user
+from app.deps import get_current_user, require_pro
 from app.llm.client import LLMError, chat
 from app.llm.embedding import embed_query
 from app.llm.prompts import (
@@ -14,7 +14,7 @@ from app.llm.prompts import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/regulations", tags=["regulations"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/regulations", tags=["regulations"], dependencies=[Depends(require_pro)])
 
 
 class AskRuleIn(BaseModel):

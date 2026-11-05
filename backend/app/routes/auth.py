@@ -266,8 +266,14 @@ def login(body: LoginIn, request: Request):
     try:
         with pool.connection() as conn:
             user = conn.execute(
-                "SELECT id, email, full_name, role, is_active, email_verified, password_hash, token_version "
-                "FROM users WHERE email = %s",
+                """
+                SELECT u.id, u.email, u.full_name, u.role, u.is_active, u.email_verified, u.password_hash, u.token_version,
+                       COALESCE(s.plan, 'free') AS plan,
+                       COALESCE(s.status, 'none') AS subscription_status
+                FROM users u
+                LEFT JOIN subscriptions s ON u.id = s.user_id
+                WHERE u.email = %s
+                """,
                 [email],
             ).fetchone()
     except Exception as exc:
@@ -313,6 +319,8 @@ def login(body: LoginIn, request: Request):
             "email": user["email"],
             "full_name": user["full_name"],
             "role": user["role"],
+            "plan": user.get("plan", "free"),
+            "subscription_status": user.get("subscription_status", "none"),
         },
     }
 
@@ -400,6 +408,8 @@ def login_with_google(body: GoogleLoginIn):
             "email": user["email"],
             "full_name": user["full_name"],
             "role": user["role"],
+            "plan": user.get("plan", "free"),
+            "subscription_status": user.get("subscription_status", "none"),
         },
     }
 @router.get("/me")

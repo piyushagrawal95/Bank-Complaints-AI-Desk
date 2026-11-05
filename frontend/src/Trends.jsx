@@ -31,7 +31,8 @@ function formatChange(pct) {
   return `${pct > 0 ? "+" : ""}${pct}%`;
 }
 
-function Trends() {
+function Trends({ currentUser, onOpenUpgradeModal }) {
+  const isPro = currentUser?.role === "admin" || currentUser?.plan === "pro";
   const [groupBy, setGroupBy] = useState("product");
   const [timelineMode, setTimelineMode] = useState("presets"); // "presets" | "range"
 
@@ -58,6 +59,10 @@ function Trends() {
       : windowPreset;
 
   useEffect(() => {
+    if (!isPro) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -103,6 +108,25 @@ function Trends() {
 
   const spikes = data ? data.items.filter((i) => i.is_spike) : [];
   const others = data ? data.items.filter((i) => !i.is_spike).slice(0, 15) : [];
+
+  if (!isPro) {
+    return (
+      <div className="trends-container">
+        <div className="trends-pro-gate">
+          <div className="pro-gate-card">
+            <div className="pro-gate-badge">PREMIUM ANALYTICS</div>
+            <h2>Statistical Volume Spike & Outage Anomaly Detection</h2>
+            <p>
+              Compare rolling 7/14/30-day complaint volumes against historical baselines to flag emerging systemic payment switch outages and operational failures.
+            </p>
+            <button type="button" className="upgrade-btn-stripe" onClick={onOpenUpgradeModal}>
+              ⚡ Upgrade to Pro to Unlock Anomaly Trends →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="trends-container">
