@@ -32,6 +32,7 @@ import {
   IconRules,
   IconSearch,
   IconShield,
+  IconSparkles,
   IconTrends,
   IconUser,
   IconUsers,
